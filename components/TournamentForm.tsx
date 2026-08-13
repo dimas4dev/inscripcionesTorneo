@@ -213,12 +213,23 @@ export default function TournamentForm() {
       <div className="bg-gradient-to-br from-emerald-700 via-emerald-800 to-emerald-900 text-white py-10 px-4">
         <div className="max-w-2xl mx-auto text-center">
           <p className="text-emerald-300 text-xs font-bold tracking-widest uppercase mb-3">
-            Ministerio Jahems · Esneth Ordóñez
+            El Ministerio Ordóñez
           </p>
           <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-3">
             ⚡ Torneo Ágape 2026
           </h1>
-          <p className="text-emerald-200 text-lg mb-4">📍 Parque La Ponderosa, Bogotá</p>
+          <a
+            href="https://www.google.com/maps/place/Parque+La+Ponderosa/@4.6111452,-74.1188985,17z/data=!3m1!4b1!4m6!3m5!1s0x8e3f994bc4d0b4e7:0x1ac3b2231dfafae3!8m2!3d4.6111452!4d-74.1188985!16s%2Fg%2F1ptzrlkk1?entry=ttu&g_ep=EgoyMDI2MDgxMS4wIKXMDSoASAFQAw%3D%3D"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 text-emerald-200 hover:text-white text-lg mb-4 transition-colors group"
+          >
+            <span>📍</span>
+            <span className="group-hover:underline">Parque La Ponderosa, Bogotá</span>
+            <svg className="w-4 h-4 opacity-70 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </a>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <span className="inline-flex items-center justify-center gap-2 bg-white/10 backdrop-blur rounded-full px-5 py-2 text-sm font-medium">
               🏐 Voleibol · Sáb. 22 Ago 2026
@@ -238,7 +249,7 @@ export default function TournamentForm() {
         {/* ── 1. Disciplina ── */}
         <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <h2 className="text-lg font-bold text-gray-900 mb-1">1. Selecciona la Disciplina</h2>
-          <p className="text-sm text-gray-500 mb-4">Cada disciplina tiene fecha y mínimo de jugadores diferente.</p>
+          <p className="text-sm text-gray-500 mb-4">Cada disciplina tiene fecha, mínimo de jugadores y modalidad diferente.</p>
           <div className="grid grid-cols-2 gap-4">
             {(['Voleibol', 'Microfútbol'] as Disciplina[]).map((d) => (
               <label
@@ -255,6 +266,13 @@ export default function TournamentForm() {
                 <span className="text-xs text-center text-gray-500">
                   {d === 'Voleibol' ? 'Sáb. 22 Ago · Mín. 6 jug.' : 'Dom. 23 Ago · Mín. 5 jug.'}
                 </span>
+                <span className={`text-xs text-center font-semibold px-2 py-0.5 rounded-full ${
+                  d === 'Voleibol'
+                    ? 'bg-purple-100 text-purple-700'
+                    : 'bg-blue-100 text-blue-700'
+                }`}>
+                  {d === 'Voleibol' ? '👫 Mixto' : '👨 Solo masculino'}
+                </span>
                 {disciplina === d && (
                   <span className="absolute top-2.5 right-2.5 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center">
                     <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -265,6 +283,19 @@ export default function TournamentForm() {
               </label>
             ))}
           </div>
+          {/* Aviso de regla mixta para Voleibol */}
+          {disciplina === 'Voleibol' && (
+            <div className="mt-4 flex gap-3 p-3.5 bg-purple-50 border border-purple-200 rounded-xl text-sm text-purple-800">
+              <span className="text-lg flex-shrink-0">👫</span>
+              <div>
+                <p className="font-semibold mb-0.5">Torneo Mixto — Regla de género en cancha</p>
+                <p className="leading-relaxed">
+                  En todo momento debe haber al menos <strong>1 jugador/a del sexo opuesto</strong> en la cancha.
+                  Ejemplo: si hay 5 hombres en el court, debe haber mínimo 1 mujer; si hay 5 mujeres, debe haber mínimo 1 hombre.
+                </p>
+              </div>
+            </div>
+          )}
         </section>
 
         {/* ── 2. Nombre del Equipo ── */}
@@ -351,6 +382,22 @@ export default function TournamentForm() {
           <p className="text-sm text-gray-500 mb-4">
             Mínimo <strong>{MINIMOS[disciplina]}</strong> jugadores para {disciplina}. Los suplentes opcionales también pagan $10.000 c/u.
           </p>
+          {disciplina === 'Voleibol' && (
+            <div className="mb-4 flex gap-2.5 p-3 bg-purple-50 border border-purple-200 rounded-xl text-xs text-purple-700 leading-relaxed">
+              <span className="flex-shrink-0">👫</span>
+              <span>
+                <strong>Torneo Mixto:</strong> Registra jugadores y jugadoras. Recuerda que en cancha siempre debe haber al menos 1 persona del sexo opuesto a la mayoría.
+              </span>
+            </div>
+          )}
+          {disciplina === 'Microfútbol' && (
+            <div className="mb-4 flex gap-2.5 p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-700 leading-relaxed">
+              <span className="flex-shrink-0">👨</span>
+              <span>
+                <strong>Solo masculino:</strong> Esta categoría es exclusivamente para jugadores hombres.
+              </span>
+            </div>
+          )}
 
           {/* Capitán (slot fijo) */}
           <div className="mb-3 flex items-center gap-3 p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl">
@@ -495,7 +542,17 @@ export default function TournamentForm() {
             <p>✅ Respeto absoluto hacia todos los participantes, árbitros y espectadores.</p>
             <p>🚫 Cero groserías ni lenguaje ofensivo durante toda la jornada.</p>
             <p>🚫 Cero consumo de alcohol antes o durante el evento.</p>
-            <p>🙏 Este es un evento del Ministerio Jahems — promovemos la sana convivencia.</p>
+            <p>🙏 Este es un evento de El Ministerio Ordóñez — promovemos la sana convivencia.</p>
+            {disciplina === 'Voleibol' && (
+              <p className="pt-1 border-t border-gray-200">
+                👫 <strong>Voleibol Mixto:</strong> En cancha siempre debe haber mínimo 1 jugador/a del sexo opuesto a la mayoría. Incumplir esta regla puede resultar en descalificación del punto o del set.
+              </p>
+            )}
+            {disciplina === 'Microfútbol' && (
+              <p className="pt-1 border-t border-gray-200">
+                👨 <strong>Microfútbol:</strong> Categoría exclusivamente masculina.
+              </p>
+            )}
           </div>
           <label className="flex items-start gap-3 cursor-pointer">
             <input
