@@ -340,12 +340,14 @@ export default function AdminDashboard() {
   const [inscripciones, setInscripciones] = useState<Inscripcion[]>([]);
   const [individuales, setIndividuales] = useState<Individual[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState('');
   const [search, setSearch] = useState('');
   const [filterDisciplina, setFilterDisciplina] = useState<Disciplina | 'Todas'>('Todas');
   const [selected, setSelected] = useState<Inscripcion | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
+    setFetchError('');
     try {
       const [snapEq, snapInd] = await Promise.all([
         getDocs(query(collection(db, 'inscripciones'), orderBy('createdAt', 'desc'))),
@@ -353,8 +355,16 @@ export default function AdminDashboard() {
       ]);
       setInscripciones(snapEq.docs.map((d) => ({ id: d.id, ...d.data() } as Inscripcion)));
       setIndividuales(snapInd.docs.map((d) => ({ id: d.id, ...d.data() } as Individual)));
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Error cargando datos:', err);
+      const code = (err as { code?: string }).code ?? '';
+      if (code === 'permission-denied') {
+        setFetchError(
+          'Sin permisos para leer los datos. Ve a Firebase Console → Firestore → Reglas y asegúrate de que las lecturas estén permitidas para usuarios autenticados.'
+        );
+      } else {
+        setFetchError('Error al cargar los datos. Intenta actualizar la página.');
+      }
     } finally {
       setLoading(false);
     }
@@ -395,6 +405,38 @@ export default function AdminDashboard() {
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
         <p>Cargando inscripciones…</p>
+      </div>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center">
+        <p className="text-4xl mb-3">🔒</p>
+        <p className="font-bold text-red-800 mb-2">Error de permisos en Firestore</p>
+        <p className="text-sm text-red-700 mb-4 max-w-lg mx-auto">{fetchError}</p>
+        <div className="bg-white border border-red-100 rounded-xl p-4 text-left text-xs font-mono text-gray-700 mb-4 max-w-lg mx-auto">
+          <p className="font-semibold text-gray-500 mb-2">Reglas correctas para Firestore:</p>
+          <pre className="whitespace-pre-wrap">{`rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /inscripciones/{docId} {
+      allow create: if true;
+      allow read, update, delete: if request.auth != null;
+    }
+    match /individuales/{docId} {
+      allow create: if true;
+      allow read, update, delete: if request.auth != null;
+    }
+  }
+}`}</pre>
+        </div>
+        <button
+          onClick={fetchData}
+          className="bg-red-600 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-red-700 transition"
+        >
+          Reintentar
+        </button>
       </div>
     );
   }
