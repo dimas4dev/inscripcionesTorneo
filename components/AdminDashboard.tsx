@@ -57,7 +57,7 @@ function exportToCSV(data: Inscripcion[]) {
     ins.totalJugadores,
     ins.totalPagarCOP,
     ins.comprobanteUrl,
-    ins.jugadores.map((j) => `${j.nombre} (${j.documento})${j.esCapitan ? ' [C]' : ''}`).join(' | '),
+    ins.jugadores.map((j) => `${j.nombre} (${j.documento})${j.genero ? ` [${j.genero === 'Masculino' ? 'M' : 'F'}]` : ''}${j.esCapitan ? ' [C]' : ''}`).join(' | '),
   ]);
 
   const csvContent = [headers, ...rows]
@@ -142,9 +142,30 @@ function PlayerModal({ inscripcion, onClose }: PlayerModalProps) {
           </div>
 
           {/* Lista de jugadores */}
-          <h4 className="font-semibold text-gray-900 mb-3">
+          <h4 className="font-semibold text-gray-900 mb-2">
             Lista de Jugadores ({inscripcion.totalJugadores})
           </h4>
+          {/* Resumen M/F */}
+          {(() => {
+            const masc = inscripcion.jugadores.filter((j) => j.genero === 'Masculino').length;
+            const fem = inscripcion.jugadores.filter((j) => j.genero === 'Femenino').length;
+            const noInfo = inscripcion.jugadores.filter((j) => !j.genero).length;
+            return (
+              <div className="flex gap-2 mb-3">
+                <span className="flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold">
+                  ♂ {masc} {masc === 1 ? 'hombre' : 'hombres'}
+                </span>
+                <span className="flex items-center gap-1 px-2.5 py-1 bg-rose-50 text-rose-600 rounded-full text-xs font-semibold">
+                  ♀ {fem} {fem === 1 ? 'mujer' : 'mujeres'}
+                </span>
+                {noInfo > 0 && (
+                  <span className="flex items-center gap-1 px-2.5 py-1 bg-gray-100 text-gray-500 rounded-full text-xs font-semibold">
+                    ? {noInfo} sin dato
+                  </span>
+                )}
+              </div>
+            );
+          })()}
           <div className="space-y-2">
             {inscripcion.jugadores.map((j, i) => (
               <div
@@ -164,11 +185,22 @@ function PlayerModal({ inscripcion, onClose }: PlayerModalProps) {
                   <p className="text-sm font-medium text-gray-900 truncate">{j.nombre}</p>
                   <p className="text-xs text-gray-500">Doc: {j.documento}</p>
                 </div>
-                {j.esCapitan && (
-                  <span className="text-xs font-semibold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full flex-shrink-0">
-                    Capitán
-                  </span>
-                )}
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  {j.genero && (
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                      j.genero === 'Masculino'
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-rose-100 text-rose-600'
+                    }`}>
+                      {j.genero === 'Masculino' ? '♂ M' : '♀ F'}
+                    </span>
+                  )}
+                  {j.esCapitan && (
+                    <span className="text-xs font-semibold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
+                      Capitán
+                    </span>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -214,10 +246,13 @@ function IndividualesPanel({ individuales, onRefresh }: IndividualsPanelProps) {
       {/* Progreso de cupos */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {(['Voleibol', 'Microfútbol'] as Disciplina[]).map((d) => {
-          const count = porDisciplina[d].length;
+          const lista = porDisciplina[d];
+          const count = lista.length;
           const min = MINIMOS[d];
           const pct = Math.min((count / min) * 100, 100);
           const complete = count >= min;
+          const masc = lista.filter((p) => p.genero === 'Masculino').length;
+          const fem = lista.filter((p) => p.genero === 'Femenino').length;
           return (
             <div
               key={d}
@@ -244,6 +279,12 @@ function IndividualesPanel({ individuales, onRefresh }: IndividualsPanelProps) {
                   style={{ width: `${pct}%` }}
                 />
               </div>
+              {count > 0 && (
+                <div className="flex gap-2 mt-2">
+                  <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">♂ {masc}</span>
+                  <span className="text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full">♀ {fem}</span>
+                </div>
+              )}
               {complete ? (
                 <p className="mt-2 text-xs font-semibold text-emerald-700 flex items-center gap-1">
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -289,6 +330,7 @@ function IndividualesPanel({ individuales, onRefresh }: IndividualsPanelProps) {
                 <tr>
                   <th className="text-left px-4 py-3 font-semibold text-gray-500">#</th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-500">Nombre</th>
+                  <th className="text-left px-4 py-3 font-semibold text-gray-500">Género</th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-500">Documento</th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-500">WhatsApp</th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-500">Disciplina</th>
@@ -300,6 +342,19 @@ function IndividualesPanel({ individuales, onRefresh }: IndividualsPanelProps) {
                   <tr key={ind.id} className="hover:bg-gray-50 transition">
                     <td className="px-4 py-3 text-gray-400 font-mono">{i + 1}</td>
                     <td className="px-4 py-3 font-semibold text-gray-900">{ind.nombre}</td>
+                    <td className="px-4 py-3">
+                      {ind.genero ? (
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                          ind.genero === 'Masculino'
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-rose-100 text-rose-600'
+                        }`}>
+                          {ind.genero === 'Masculino' ? '♂ M' : '♀ F'}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-gray-600">{ind.documento}</td>
                     <td className="px-4 py-3">
                       <a
@@ -588,6 +643,7 @@ service cloud.firestore {
                   <th className="text-left px-4 py-3 font-semibold text-gray-500">Capitán</th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-500">WhatsApp</th>
                   <th className="text-center px-4 py-3 font-semibold text-gray-500">Jug.</th>
+                  <th className="text-left px-4 py-3 font-semibold text-gray-500">M / F</th>
                   <th className="text-right px-4 py-3 font-semibold text-gray-500">Total</th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-500 whitespace-nowrap">Fecha</th>
                   <th className="text-center px-4 py-3 font-semibold text-gray-500">Acciones</th>
@@ -626,6 +682,18 @@ service cloud.firestore {
                       <span className="inline-flex items-center justify-center w-7 h-7 bg-gray-100 rounded-full text-xs font-bold text-gray-700">
                         {ins.totalJugadores}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {(() => {
+                        const masc = ins.jugadores.filter((j) => j.genero === 'Masculino').length;
+                        const fem = ins.jugadores.filter((j) => j.genero === 'Femenino').length;
+                        return (
+                          <div className="flex gap-1">
+                            <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded-full">♂{masc}</span>
+                            <span className="text-xs font-semibold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded-full">♀{fem}</span>
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-3 text-right font-semibold text-gray-900 whitespace-nowrap">
                       {formatCOP(ins.totalPagarCOP)}

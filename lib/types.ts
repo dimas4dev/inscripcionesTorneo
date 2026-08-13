@@ -2,12 +2,14 @@ import { Timestamp } from 'firebase/firestore';
 
 export type Disciplina = 'Voleibol' | 'Microfútbol';
 export type FechaTorneo = '2026-08-22' | '2026-08-23';
+export type Genero = 'Masculino' | 'Femenino';
 
 export interface Capitan {
   nombre: string;
   documento: string;
   telefono: string;
   email: string;
+  genero: Genero;
 }
 
 export interface Jugador {
@@ -15,6 +17,7 @@ export interface Jugador {
   nombre: string;
   documento: string;
   esCapitan: boolean;
+  genero: Genero;
 }
 
 export interface Inscripcion {
@@ -34,6 +37,7 @@ export interface Inscripcion {
 export interface JugadorFormField {
   nombre: string;
   documento: string;
+  genero: Genero;
 }
 
 export interface FormValues {
@@ -51,5 +55,6 @@ export interface Individual {
   telefono: string;
   email: string;
   disciplina: Disciplina;
+  genero: Genero;
   createdAt?: Timestamp;
 }

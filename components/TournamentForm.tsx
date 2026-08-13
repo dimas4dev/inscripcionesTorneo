@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Disciplina, FormValues } from '@/lib/types';
+import { Disciplina, Genero, FormValues } from '@/lib/types';
 
 const PRECIO_POR_JUGADOR = 10_000;
 const MINIMOS: Record<Disciplina, number> = { Voleibol: 6, 'Microfútbol': 5 };
@@ -23,6 +23,35 @@ function formatCOP(amount: number): string {
 
 function generateId(): string {
   return Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
+}
+
+function GenderToggle({
+  value,
+  onChange,
+}: {
+  value: Genero;
+  onChange: (g: Genero) => void;
+}) {
+  return (
+    <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-semibold">
+      {(['Masculino', 'Femenino'] as Genero[]).map((g) => (
+        <button
+          key={g}
+          type="button"
+          onClick={() => onChange(g)}
+          className={`flex-1 px-3 py-2 transition-colors ${
+            value === g
+              ? g === 'Masculino'
+                ? 'bg-blue-500 text-white'
+                : 'bg-rose-500 text-white'
+              : 'bg-white text-gray-500 hover:bg-gray-50'
+          }`}
+        >
+          {g === 'Masculino' ? '♂ M' : '♀ F'}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 interface SubmittedData {
@@ -45,12 +74,13 @@ export default function TournamentForm() {
     handleSubmit,
     control,
     watch,
+    setValue,
     reset,
     formState: { errors },
   } = useForm<FormValues>({
     defaultValues: {
       disciplina: 'Voleibol',
-      jugadores: Array.from({ length: 5 }, () => ({ nombre: '', documento: '' })),
+      jugadores: Array.from({ length: 5 }, () => ({ nombre: '', documento: '', genero: 'Masculino' as Genero })),
     },
   });
 
@@ -72,7 +102,7 @@ export default function TournamentForm() {
     const currentCount = fields.length;
     if (currentCount < requiredCount) {
       for (let i = currentCount; i < requiredCount; i++) {
-        append({ nombre: '', documento: '' }, { shouldFocus: false });
+        append({ nombre: '', documento: '', genero: 'Masculino' }, { shouldFocus: false });
       }
     }
   }, [disciplina]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -133,8 +163,8 @@ export default function TournamentForm() {
       const comprobanteUrl = await uploadComprobante(comprobanteFile);
 
       const jugadores = [
-        { id: generateId(), nombre: data.capitan.nombre, documento: data.capitan.documento, esCapitan: true },
-        ...data.jugadores.map((j) => ({ id: generateId(), nombre: j.nombre, documento: j.documento, esCapitan: false })),
+        { id: generateId(), nombre: data.capitan.nombre, documento: data.capitan.documento, esCapitan: true, genero: data.capitan.genero },
+        ...data.jugadores.map((j) => ({ id: generateId(), nombre: j.nombre, documento: j.documento, esCapitan: false, genero: j.genero })),
       ];
 
       await addDoc(collection(db, 'inscripciones'), {
@@ -333,6 +363,13 @@ export default function TournamentForm() {
                 <p className="text-red-500 text-xs mt-1">{errors.capitan.email.message}</p>
               )}
             </div>
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Género *</label>
+              <GenderToggle
+                value={watch('capitan.genero') ?? 'Masculino'}
+                onChange={(g) => setValue('capitan.genero', g)}
+              />
+            </div>
           </div>
         </section>
 
@@ -384,29 +421,35 @@ export default function TournamentForm() {
                 <span className="w-8 h-8 bg-gray-100 text-gray-500 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-3">
                   {index + 2}
                 </span>
-                <div className="flex-1 grid grid-cols-2 gap-2">
-                  <div>
-                    <input
-                      type="text"
-                      placeholder="Nombre completo"
-                      {...register(`jugadores.${index}.nombre`, { required: true })}
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none transition"
-                    />
-                    {errors.jugadores?.[index]?.nombre && (
-                      <p className="text-red-500 text-xs mt-0.5">Requerido</p>
-                    )}
+                <div className="flex-1 space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <input
+                        type="text"
+                        placeholder="Nombre completo"
+                        {...register(`jugadores.${index}.nombre`, { required: true })}
+                        className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none transition"
+                      />
+                      {errors.jugadores?.[index]?.nombre && (
+                        <p className="text-red-500 text-xs mt-0.5">Requerido</p>
+                      )}
+                    </div>
+                    <div>
+                      <input
+                        type="text"
+                        placeholder="N° Documento"
+                        {...register(`jugadores.${index}.documento`, { required: true })}
+                        className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none transition"
+                      />
+                      {errors.jugadores?.[index]?.documento && (
+                        <p className="text-red-500 text-xs mt-0.5">Requerido</p>
+                      )}
+                    </div>
                   </div>
-                  <div>
-                    <input
-                      type="text"
-                      placeholder="N° Documento"
-                      {...register(`jugadores.${index}.documento`, { required: true })}
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none transition"
-                    />
-                    {errors.jugadores?.[index]?.documento && (
-                      <p className="text-red-500 text-xs mt-0.5">Requerido</p>
-                    )}
-                  </div>
+                  <GenderToggle
+                    value={(watch(`jugadores.${index}.genero`) as Genero) ?? 'Masculino'}
+                    onChange={(g) => setValue(`jugadores.${index}.genero`, g)}
+                  />
                 </div>
                 <button
                   type="button"
@@ -425,7 +468,7 @@ export default function TournamentForm() {
 
           <button
             type="button"
-            onClick={() => append({ nombre: '', documento: '' })}
+            onClick={() => append({ nombre: '', documento: '', genero: 'Masculino' })}
             className="mt-4 w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 rounded-xl py-3 text-sm font-medium text-gray-500 hover:border-emerald-400 hover:text-emerald-600 hover:bg-emerald-50 transition"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -434,7 +477,26 @@ export default function TournamentForm() {
             Agregar jugador suplente
           </button>
 
-          <div className="mt-4 flex justify-between items-center p-4 bg-emerald-50 rounded-xl border border-emerald-100">
+          {(() => {
+            const allPlayers = [
+              { genero: watch('capitan.genero') ?? 'Masculino' },
+              ...fields.map((_, i) => ({ genero: watch(`jugadores.${i}.genero`) ?? 'Masculino' })),
+            ];
+            const masculinos = allPlayers.filter((p) => p.genero === 'Masculino').length;
+            const femeninos = allPlayers.filter((p) => p.genero === 'Femenino').length;
+            return (
+              <div className="mt-3 flex gap-3 text-xs font-semibold">
+                <span className="flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full">
+                  ♂ {masculinos} {masculinos === 1 ? 'hombre' : 'hombres'}
+                </span>
+                <span className="flex items-center gap-1 px-3 py-1.5 bg-rose-50 text-rose-600 rounded-full">
+                  ♀ {femeninos} {femeninos === 1 ? 'mujer' : 'mujeres'}
+                </span>
+              </div>
+            );
+          })()}
+
+          <div className="mt-3 flex justify-between items-center p-4 bg-emerald-50 rounded-xl border border-emerald-100">
             <span className="text-sm text-gray-600">
               {totalJugadores} jugadores × $10.000 COP
             </span>

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Disciplina } from '@/lib/types';
+import { Disciplina, Genero } from '@/lib/types';
 
 const MINIMOS: Record<Disciplina, number> = { Voleibol: 6, 'Microfútbol': 5 };
 
@@ -14,6 +14,7 @@ interface IndividualFormValues {
   telefono: string;
   email: string;
   disciplina: Disciplina;
+  genero: Genero;
 }
 
 export default function IndividualForm() {
@@ -25,13 +26,15 @@ export default function IndividualForm() {
     register,
     handleSubmit,
     watch,
+    setValue,
     reset,
     formState: { errors },
   } = useForm<IndividualFormValues>({
-    defaultValues: { disciplina: 'Voleibol' },
+    defaultValues: { disciplina: 'Voleibol', genero: 'Masculino' },
   });
 
   const disciplina = watch('disciplina');
+  const genero = watch('genero');
 
   const onSubmit = async (data: IndividualFormValues) => {
     setSubmitting(true);
@@ -43,6 +46,7 @@ export default function IndividualForm() {
         telefono: data.telefono,
         email: data.email,
         disciplina: data.disciplina,
+        genero: data.genero,
         createdAt: serverTimestamp(),
       });
       setSubmittedDisciplina(data.disciplina);
@@ -205,6 +209,27 @@ export default function IndividualForm() {
                 className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition text-sm"
               />
               {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Género *</label>
+              <div className="flex rounded-xl border border-gray-200 overflow-hidden text-sm font-semibold">
+                {(['Masculino', 'Femenino'] as Genero[]).map((g) => (
+                  <button
+                    key={g}
+                    type="button"
+                    onClick={() => setValue('genero', g)}
+                    className={`flex-1 px-4 py-3 transition-colors ${
+                      genero === g
+                        ? g === 'Masculino'
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-rose-500 text-white'
+                        : 'bg-white text-gray-500 hover:bg-gray-50'
+                    }`}
+                  >
+                    {g === 'Masculino' ? '♂ Masculino' : '♀ Femenino'}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </section>
