@@ -43,3 +43,13 @@ export interface FormValues {
   jugadores: JugadorFormField[];
   reglamentoAceptado: boolean;
 }
+
+export interface Individual {
+  id?: string;
+  nombre: string;
+  documento: string;
+  telefono: string;
+  email: string;
+  disciplina: Disciplina;
+  createdAt?: Timestamp;
+}

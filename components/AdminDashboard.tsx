@@ -3,7 +3,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Inscripcion, Disciplina } from '@/lib/types';
+import { Inscripcion, Individual, Disciplina } from '@/lib/types';
+
+const MINIMOS: Record<Disciplina, number> = { Voleibol: 6, 'Microfútbol': 5 };
 
 function formatCOP(amount: number): string {
   return new Intl.NumberFormat('es-CO', {
@@ -195,9 +197,148 @@ function PlayerModal({ inscripcion, onClose }: PlayerModalProps) {
   );
 }
 
+// ── Panel de Individuales ───────────────────────────────────────────────────
+interface IndividualsPanelProps {
+  individuales: Individual[];
+  onRefresh: () => void;
+}
+
+function IndividualesPanel({ individuales, onRefresh }: IndividualsPanelProps) {
+  const porDisciplina = useMemo(() => ({
+    Voleibol: individuales.filter((i) => i.disciplina === 'Voleibol'),
+    'Microfútbol': individuales.filter((i) => i.disciplina === 'Microfútbol'),
+  }), [individuales]);
+
+  return (
+    <div className="space-y-5">
+      {/* Progreso de cupos */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {(['Voleibol', 'Microfútbol'] as Disciplina[]).map((d) => {
+          const count = porDisciplina[d].length;
+          const min = MINIMOS[d];
+          const pct = Math.min((count / min) * 100, 100);
+          const complete = count >= min;
+          return (
+            <div
+              key={d}
+              className={`bg-white rounded-xl border p-5 ${
+                complete ? 'border-emerald-300 shadow-emerald-100 shadow-md' : 'border-gray-100 shadow-sm'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="font-bold text-gray-900">{d === 'Voleibol' ? '🏐' : '⚽'} {d}</p>
+                  <p className="text-xs text-gray-500">
+                    {d === 'Voleibol' ? 'Mixto · Sáb. 22 Ago' : 'Masculino · Dom. 23 Ago'}
+                  </p>
+                </div>
+                <span className={`text-2xl font-extrabold ${complete ? 'text-emerald-600' : 'text-gray-900'}`}>
+                  {count}<span className="text-sm font-normal text-gray-400">/{min}</span>
+                </span>
+              </div>
+              <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    complete ? 'bg-emerald-500' : pct >= 60 ? 'bg-amber-400' : 'bg-purple-400'
+                  }`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              {complete ? (
+                <p className="mt-2 text-xs font-semibold text-emerald-700 flex items-center gap-1">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  </svg>
+                  ¡Cupo completo! Contáctalos para confirmar participación.
+                </p>
+              ) : (
+                <p className="mt-2 text-xs text-gray-400">
+                  Faltan <strong>{min - count}</strong> personas para completar el cupo mínimo.
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Tabla de individuales */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+          <p className="font-semibold text-gray-700 text-sm">
+            {individuales.length} persona{individuales.length !== 1 ? 's' : ''} en lista de espera
+          </p>
+          <button
+            onClick={onRefresh}
+            className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Actualizar
+          </button>
+        </div>
+        {individuales.length === 0 ? (
+          <div className="text-center py-14 text-gray-400">
+            <p className="text-4xl mb-3">👤</p>
+            <p className="font-medium">Aún no hay inscripciones individuales</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[500px]">
+              <thead className="bg-gray-50 border-b border-gray-100">
+                <tr>
+                  <th className="text-left px-4 py-3 font-semibold text-gray-500">#</th>
+                  <th className="text-left px-4 py-3 font-semibold text-gray-500">Nombre</th>
+                  <th className="text-left px-4 py-3 font-semibold text-gray-500">Documento</th>
+                  <th className="text-left px-4 py-3 font-semibold text-gray-500">WhatsApp</th>
+                  <th className="text-left px-4 py-3 font-semibold text-gray-500">Disciplina</th>
+                  <th className="text-left px-4 py-3 font-semibold text-gray-500">Fecha</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {individuales.map((ind, i) => (
+                  <tr key={ind.id} className="hover:bg-gray-50 transition">
+                    <td className="px-4 py-3 text-gray-400 font-mono">{i + 1}</td>
+                    <td className="px-4 py-3 font-semibold text-gray-900">{ind.nombre}</td>
+                    <td className="px-4 py-3 text-gray-600">{ind.documento}</td>
+                    <td className="px-4 py-3">
+                      <a
+                        href={`https://wa.me/${ind.telefono.replace(/\D/g, '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-emerald-600 hover:underline"
+                      >
+                        {ind.telefono}
+                      </a>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                        ind.disciplina === 'Voleibol'
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {ind.disciplina === 'Voleibol' ? '🏐' : '⚽'} {ind.disciplina}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
+                      {formatDate(ind.createdAt)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Dashboard principal ─────────────────────────────────────────────────────
 export default function AdminDashboard() {
+  const [activeTab, setActiveTab] = useState<'equipos' | 'individuales'>('equipos');
   const [inscripciones, setInscripciones] = useState<Inscripcion[]>([]);
+  const [individuales, setIndividuales] = useState<Individual[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterDisciplina, setFilterDisciplina] = useState<Disciplina | 'Todas'>('Todas');
@@ -206,11 +347,14 @@ export default function AdminDashboard() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const q = query(collection(db, 'inscripciones'), orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
-      setInscripciones(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Inscripcion)));
+      const [snapEq, snapInd] = await Promise.all([
+        getDocs(query(collection(db, 'inscripciones'), orderBy('createdAt', 'desc'))),
+        getDocs(query(collection(db, 'individuales'), orderBy('createdAt', 'desc'))),
+      ]);
+      setInscripciones(snapEq.docs.map((d) => ({ id: d.id, ...d.data() } as Inscripcion)));
+      setIndividuales(snapInd.docs.map((d) => ({ id: d.id, ...d.data() } as Individual)));
     } catch (err) {
-      console.error('Error cargando inscripciones:', err);
+      console.error('Error cargando datos:', err);
     } finally {
       setLoading(false);
     }
@@ -257,6 +401,45 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-5">
+      {/* Tabs */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="flex">
+          {([
+            { id: 'equipos', label: 'Equipos', count: inscripciones.length, icon: '🏆' },
+            { id: 'individuales', label: 'Lista Individual', count: individuales.length, icon: '👤' },
+          ] as const).map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-sm font-semibold border-b-2 transition-colors ${
+                activeTab === tab.id
+                  ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <span>{tab.icon}</span>
+              {tab.label}
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                activeTab === tab.id ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'
+              }`}>
+                {tab.count}
+              </span>
+              {tab.id === 'individuales' && individuales.length > 0 && (() => {
+                const vComplete = individuales.filter(i => i.disciplina === 'Voleibol').length >= MINIMOS.Voleibol;
+                const mComplete = individuales.filter(i => i.disciplina === 'Microfútbol').length >= MINIMOS['Microfútbol'];
+                return (vComplete || mComplete) ? (
+                  <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" title="¡Cupo completo!" />
+                ) : null;
+              })()}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {activeTab === 'individuales' ? (
+        <IndividualesPanel individuales={individuales} onRefresh={fetchData} />
+      ) : (
+      <>
       {/* Estadísticas */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
@@ -442,6 +625,8 @@ export default function AdminDashboard() {
       </div>
 
       {selected && <PlayerModal inscripcion={selected} onClose={() => setSelected(null)} />}
+      </>
+      )}
     </div>
   );
 }

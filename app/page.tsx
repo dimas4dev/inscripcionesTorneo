@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 
-const TournamentForm = dynamic(() => import('@/components/TournamentForm'), {
+const HomeView = dynamic(() => import('@/components/HomeView'), {
   ssr: false,
   loading: () => (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -15,5 +15,5 @@ const TournamentForm = dynamic(() => import('@/components/TournamentForm'), {
 });
 
 export default function Home() {
-  return <TournamentForm />;
+  return <HomeView />;
 }
