@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { useState, useEffect, useMemo, type ReactNode } from 'react';
+import { collection, deleteDoc, doc, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Inscripcion, Individual, Disciplina } from '@/lib/types';
 
@@ -229,13 +229,102 @@ function PlayerModal({ inscripcion, onClose }: PlayerModalProps) {
   );
 }
 
+// ── Modal de confirmación de borrado ────────────────────────────────────────
+interface ConfirmDeleteModalProps {
+  title: string;
+  description: ReactNode;
+  loading: boolean;
+  error: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+function ConfirmDeleteModal({
+  title,
+  description,
+  loading,
+  error,
+  onConfirm,
+  onCancel,
+}: ConfirmDeleteModalProps) {
+  return (
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      onClick={loading ? undefined : onCancel}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md"
+        onClick={(e) => e.stopPropagation()}
+        role="alertdialog"
+        aria-labelledby="confirm-delete-title"
+        aria-describedby="confirm-delete-desc"
+      >
+        <div className="p-6">
+          <div className="flex items-start gap-3 mb-4">
+            <div className="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+                />
+              </svg>
+            </div>
+            <div>
+              <h3 id="confirm-delete-title" className="text-lg font-bold text-gray-900">
+                {title}
+              </h3>
+              <p id="confirm-delete-desc" className="text-sm text-gray-600 mt-1.5 leading-relaxed">
+                {description}
+              </p>
+            </div>
+          </div>
+
+          {error && (
+            <p className="mb-4 text-sm text-red-700 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
+              {error}
+            </p>
+          )}
+
+          <div className="flex gap-2 justify-end">
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={loading}
+              className="px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 transition"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={onConfirm}
+              disabled={loading}
+              className="px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 transition flex items-center gap-2"
+            >
+              {loading && (
+                <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              )}
+              {loading ? 'Eliminando…' : 'Sí, eliminar'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Panel de Individuales ───────────────────────────────────────────────────
 interface IndividualsPanelProps {
   individuales: Individual[];
   onRefresh: () => void;
+  onRequestDelete: (individual: Individual) => void;
 }
 
-function IndividualesPanel({ individuales, onRefresh }: IndividualsPanelProps) {
+function IndividualesPanel({ individuales, onRefresh, onRequestDelete }: IndividualsPanelProps) {
   const porDisciplina = useMemo(() => ({
     Voleibol: individuales.filter((i) => i.disciplina === 'Voleibol'),
     'Microfútbol': individuales.filter((i) => i.disciplina === 'Microfútbol'),
@@ -335,6 +424,7 @@ function IndividualesPanel({ individuales, onRefresh }: IndividualsPanelProps) {
                   <th className="text-left px-4 py-3 font-semibold text-gray-500">WhatsApp</th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-500">Disciplina</th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-500">Fecha</th>
+                  <th className="text-center px-4 py-3 font-semibold text-gray-500">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -378,6 +468,25 @@ function IndividualesPanel({ individuales, onRefresh }: IndividualsPanelProps) {
                     <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
                       {formatDate(ind.createdAt)}
                     </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-center">
+                        <button
+                          type="button"
+                          onClick={() => onRequestDelete(ind)}
+                          className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition"
+                          title="Eliminar inscripción"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -399,6 +508,13 @@ export default function AdminDashboard() {
   const [search, setSearch] = useState('');
   const [filterDisciplina, setFilterDisciplina] = useState<Disciplina | 'Todas'>('Todas');
   const [selected, setSelected] = useState<Inscripcion | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<
+    | { type: 'equipo'; item: Inscripcion }
+    | { type: 'individual'; item: Individual }
+    | null
+  >(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   const fetchData = async () => {
     setLoading(true);
@@ -428,6 +544,34 @@ export default function AdminDashboard() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const handleConfirmDelete = async () => {
+    if (!pendingDelete?.item.id) return;
+    setDeleting(true);
+    setDeleteError('');
+    const id = pendingDelete.item.id;
+    const collectionName = pendingDelete.type === 'equipo' ? 'inscripciones' : 'individuales';
+    try {
+      await deleteDoc(doc(db, collectionName, id));
+      if (pendingDelete.type === 'equipo') {
+        setInscripciones((prev) => prev.filter((ins) => ins.id !== id));
+        if (selected?.id === id) setSelected(null);
+      } else {
+        setIndividuales((prev) => prev.filter((ind) => ind.id !== id));
+      }
+      setPendingDelete(null);
+    } catch (err: unknown) {
+      console.error('Error eliminando inscripción:', err);
+      const code = (err as { code?: string }).code ?? '';
+      if (code === 'permission-denied') {
+        setDeleteError('Sin permisos para eliminar. Revisa las reglas de Firestore para usuarios autenticados.');
+      } else {
+        setDeleteError('No se pudo eliminar. Inténtalo de nuevo.');
+      }
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const filtered = useMemo(
     () =>
@@ -534,7 +678,14 @@ service cloud.firestore {
       </div>
 
       {activeTab === 'individuales' ? (
-        <IndividualesPanel individuales={individuales} onRefresh={fetchData} />
+        <IndividualesPanel
+          individuales={individuales}
+          onRefresh={fetchData}
+          onRequestDelete={(item) => {
+            setDeleteError('');
+            setPendingDelete({ type: 'individual', item });
+          }}
+        />
       ) : (
       <>
       {/* Estadísticas */}
@@ -724,6 +875,24 @@ service cloud.firestore {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                           </svg>
                         </a>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDeleteError('');
+                            setPendingDelete({ type: 'equipo', item: ins });
+                          }}
+                          className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition"
+                          title="Eliminar equipo"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                            />
+                          </svg>
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -736,6 +905,35 @@ service cloud.firestore {
 
       {selected && <PlayerModal inscripcion={selected} onClose={() => setSelected(null)} />}
       </>
+      )}
+      {pendingDelete && (
+        <ConfirmDeleteModal
+          title={pendingDelete.type === 'equipo' ? 'Eliminar equipo' : 'Eliminar inscripción'}
+          description={
+            pendingDelete.type === 'equipo' ? (
+              <>
+                Se eliminará el equipo{' '}
+                <strong className="text-gray-900">{pendingDelete.item.equipoNombre}</strong>
+                {' '}({pendingDelete.item.totalJugadores} jugador
+                {pendingDelete.item.totalJugadores !== 1 ? 'es' : ''}) y no se podrá recuperar.
+              </>
+            ) : (
+              <>
+                Se eliminará a{' '}
+                <strong className="text-gray-900">{pendingDelete.item.nombre}</strong>
+                {' '}de la lista individual y no se podrá recuperar.
+              </>
+            )
+          }
+          loading={deleting}
+          error={deleteError}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => {
+            if (deleting) return;
+            setPendingDelete(null);
+            setDeleteError('');
+          }}
+        />
       )}
     </div>
   );
