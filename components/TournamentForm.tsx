@@ -570,6 +570,13 @@ export default function TournamentForm() {
             <p>🚫 Cero groserías ni lenguaje ofensivo durante toda la jornada.</p>
             <p>🚫 Cero consumo de alcohol antes o durante el evento.</p>
             <p>🙏 Este es un evento de El Ministerio Ordóñez — promovemos la sana convivencia.</p>
+            <div className="pt-2 mt-1 border-t border-amber-200 bg-amber-50 -mx-1 px-3 py-2.5 rounded-lg text-amber-900">
+              <p>
+                🚫 <strong>No se admiten jugadores piratas ni semiprofesionales</strong> que vengan solo a
+                competir por dinero o a imponer un nivel profesional. El Torneo Ágape es un espacio de
+                integración y sana convivencia. Incumplir esta regla puede resultar en la exclusión del equipo.
+              </p>
+            </div>
             {disciplina === 'Voleibol' && (
               <p className="pt-1 border-t border-gray-200">
                 👫 <strong>Voleibol Mixto:</strong> En cancha siempre debe haber mínimo 1 jugador/a del sexo opuesto a la mayoría. Incumplir esta regla puede resultar en descalificación del punto o del set.
@@ -591,7 +598,7 @@ export default function TournamentForm() {
             />
             <span className="text-sm text-gray-700">
               Confirmo que he leído y acepto el reglamento de convivencia del Torneo Ágape 2026 para todos los
-              miembros de mi equipo.
+              miembros de mi equipo, incluyendo que no participamos con jugadores piratas ni semiprofesionales.
             </span>
           </label>
           {errors.reglamentoAceptado && (

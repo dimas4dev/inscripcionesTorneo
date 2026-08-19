@@ -41,6 +41,9 @@ export default function HeroBanner() {
         <p className="mt-4 text-emerald-400 text-xs">
           Coordinadores: Dimas Mendoza &amp; Jefferson Morales
         </p>
+        <p className="mt-3 mx-auto max-w-md text-emerald-100/90 text-xs leading-relaxed">
+          Este torneo es un espacio de integración y sana convivencia. No se admiten jugadores piratas ni semiprofesionales.
+        </p>
       </div>
     </div>
   );

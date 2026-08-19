@@ -15,6 +15,7 @@ interface IndividualFormValues {
   email: string;
   disciplina: Disciplina;
   genero: Genero;
+  reglamentoAceptado: boolean;
 }
 
 export default function IndividualForm() {
@@ -47,6 +48,7 @@ export default function IndividualForm() {
         email: data.email,
         disciplina: data.disciplina,
         genero: data.genero,
+        reglamentoAceptado: data.reglamentoAceptado,
         createdAt: serverTimestamp(),
       });
       setSubmittedDisciplina(data.disciplina);
@@ -232,6 +234,38 @@ export default function IndividualForm() {
               </div>
             </div>
           </div>
+        </section>
+
+        <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <h2 className="text-lg font-bold text-gray-900 mb-4">3. Reglamento de Convivencia</h2>
+          <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-700 space-y-2 mb-4 leading-relaxed">
+            <p>✅ Respeto absoluto hacia todos los participantes, árbitros y espectadores.</p>
+            <p>🚫 Cero groserías ni lenguaje ofensivo durante toda la jornada.</p>
+            <p>🚫 Cero consumo de alcohol antes o durante el evento.</p>
+            <p>🙏 Este es un evento de El Ministerio Ordóñez — promovemos la sana convivencia.</p>
+            <div className="pt-2 mt-1 border-t border-amber-200 bg-amber-50 -mx-1 px-3 py-2.5 rounded-lg text-amber-900">
+              <p>
+                🚫 <strong>No se admiten jugadores piratas ni semiprofesionales</strong> que vengan solo a
+                competir por dinero o a imponer un nivel profesional. El Torneo Ágape es un espacio de
+                integración y sana convivencia. Incumplir esta regla puede resultar en la exclusión.
+              </p>
+            </div>
+          </div>
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              {...register('reglamentoAceptado', {
+                required: 'Debes aceptar el reglamento para continuar',
+              })}
+              className="mt-0.5 w-5 h-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500 flex-shrink-0"
+            />
+            <span className="text-sm text-gray-700">
+              Confirmo que he leído y acepto el reglamento, incluyendo que no soy jugador pirata ni semiprofesional.
+            </span>
+          </label>
+          {errors.reglamentoAceptado && (
+            <p className="text-red-500 text-sm mt-2">{errors.reglamentoAceptado.message}</p>
+          )}
         </section>
 
         {error && (
