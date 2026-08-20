@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "⚡ Torneo Ágape 2026 — ¡Inscribe tu equipo!",
     description:
-      "🏐 Voleibol (22 Ago) · ⚽ Microfútbol (23 Ago) · Parque La Ponderosa, Bogotá · El Ministerio Ordóñez · $10.000 COP por jugador",
+      "🏐 Voleibol (22 Ago) · ⚽ Microfútbol (23 Ago) · Parque La Ponderosa, Bogotá · El Ministerio Ordóñez · $10.000 COP reserva el cupo de tu equipo",
     url: BASE_URL,
     siteName: "Torneo Ágape 2026",
     images: [

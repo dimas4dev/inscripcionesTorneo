@@ -207,7 +207,7 @@ function PlayerModal({ inscripcion, onClose }: PlayerModalProps) {
 
           {/* Total */}
           <div className="mt-4 flex items-center justify-between p-3.5 bg-emerald-50 rounded-xl border border-emerald-100">
-            <span className="text-sm font-medium text-gray-700">Total a pagar</span>
+            <span className="text-sm font-medium text-gray-700">Pago de reserva</span>
             <span className="font-extrabold text-emerald-700">{formatCOP(inscripcion.totalPagarCOP)}</span>
           </div>
 
@@ -703,9 +703,9 @@ service cloud.firestore {
           <p className="text-3xl font-extrabold text-blue-900">{stats.microfutbol}</p>
         </div>
         <div className="bg-amber-50 rounded-xl border border-amber-100 p-4">
-          <p className="text-xs font-medium text-amber-600 uppercase tracking-wide mb-1">💰 Total Esperado</p>
+          <p className="text-xs font-medium text-amber-600 uppercase tracking-wide mb-1">💰 Reservas de cupo</p>
           <p className="text-xl font-extrabold text-amber-900">{formatCOP(stats.totalRecaudado)}</p>
-          <p className="text-xs text-amber-600 mt-0.5">{stats.totalJugadores} jugadores</p>
+          <p className="text-xs text-amber-600 mt-0.5">{stats.totalJugadores} jugadores registrados</p>
         </div>
       </div>
 

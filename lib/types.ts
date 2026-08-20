@@ -31,6 +31,8 @@ export interface Inscripcion {
   totalPagarCOP: number;
   comprobanteUrl: string;
   reglamentoAceptado: boolean;
+  reservaCupo?: boolean;
+  reservaNoReembolsableAceptada?: boolean;
   createdAt?: Timestamp;
 }
 
@@ -46,6 +48,7 @@ export interface FormValues {
   capitan: Capitan;
   jugadores: JugadorFormField[];
   reglamentoAceptado: boolean;
+  reservaNoReembolsableAceptada: boolean;
 }
 
 export interface Individual {

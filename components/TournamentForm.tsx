@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -61,13 +61,14 @@ interface SubmittedData {
   totalPagarCOP: number;
 }
 
+const PAGO_RESERVA = PRECIO_POR_JUGADOR;
+
 export default function TournamentForm() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [comprobanteFile, setComprobanteFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedData, setSubmittedData] = useState<SubmittedData | null>(null);
   const [submitError, setSubmitError] = useState('');
-  const isFirstRender = useRef(true);
 
   const {
     register,
@@ -80,7 +81,10 @@ export default function TournamentForm() {
   } = useForm<FormValues>({
     defaultValues: {
       disciplina: 'Voleibol',
-      jugadores: Array.from({ length: 5 }, () => ({ nombre: '', documento: '', genero: 'Masculino' as Genero })),
+      capitan: { nombre: '', documento: '', telefono: '', email: '', genero: 'Masculino' },
+      jugadores: [],
+      reglamentoAceptado: false,
+      reservaNoReembolsableAceptada: false,
     },
   });
 
@@ -89,23 +93,8 @@ export default function TournamentForm() {
   const disciplina = watch('disciplina');
   const capitanNombre = watch('capitan.nombre');
 
-  const minAdicionales = MINIMOS[disciplina] - 1;
   const totalJugadores = 1 + fields.length;
-  const totalPagar = totalJugadores * PRECIO_POR_JUGADOR;
-
-  useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
-    const requiredCount = MINIMOS[disciplina] - 1;
-    const currentCount = fields.length;
-    if (currentCount < requiredCount) {
-      for (let i = currentCount; i < requiredCount; i++) {
-        append({ nombre: '', documento: '', genero: 'Masculino' }, { shouldFocus: false });
-      }
-    }
-  }, [disciplina]); // eslint-disable-line react-hooks/exhaustive-deps
+  const totalPagar = PAGO_RESERVA;
 
   const uploadComprobante = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -162,9 +151,13 @@ export default function TournamentForm() {
     try {
       const comprobanteUrl = await uploadComprobante(comprobanteFile);
 
+      const jugadoresAdicionales = data.jugadores.filter(
+        (j) => j.nombre.trim() !== '' && j.documento.trim() !== ''
+      );
+
       const jugadores = [
         { id: generateId(), nombre: data.capitan.nombre, documento: data.capitan.documento, esCapitan: true, genero: data.capitan.genero },
-        ...data.jugadores.map((j) => ({ id: generateId(), nombre: j.nombre, documento: j.documento, esCapitan: false, genero: j.genero })),
+        ...jugadoresAdicionales.map((j) => ({ id: generateId(), nombre: j.nombre, documento: j.documento, esCapitan: false, genero: j.genero })),
       ];
 
       await addDoc(collection(db, 'inscripciones'), {
@@ -174,9 +167,11 @@ export default function TournamentForm() {
         capitan: data.capitan,
         jugadores,
         totalJugadores: jugadores.length,
-        totalPagarCOP: jugadores.length * PRECIO_POR_JUGADOR,
+        totalPagarCOP: PAGO_RESERVA,
         comprobanteUrl,
         reglamentoAceptado: data.reglamentoAceptado,
+        reservaCupo: true,
+        reservaNoReembolsableAceptada: data.reservaNoReembolsableAceptada,
         createdAt: serverTimestamp(),
       });
 
@@ -184,12 +179,11 @@ export default function TournamentForm() {
         equipoNombre: data.equipoNombre,
         disciplina: data.disciplina,
         totalJugadores: jugadores.length,
-        totalPagarCOP: jugadores.length * PRECIO_POR_JUGADOR,
+        totalPagarCOP: PAGO_RESERVA,
       });
       reset();
       setComprobanteFile(null);
       setUploadProgress(0);
-      isFirstRender.current = true;
     } catch (err) {
       console.error(err);
       setSubmitError('Ocurrió un error al enviar la inscripción. Intenta de nuevo.');
@@ -207,21 +201,24 @@ export default function TournamentForm() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h2 className="text-2xl font-extrabold text-gray-900 mb-2">¡Inscripción Exitosa!</h2>
+          <h2 className="text-2xl font-extrabold text-gray-900 mb-2">¡Cupo reservado!</h2>
           <p className="text-gray-500 mb-6">
-            El equipo <strong className="text-gray-800">{submittedData.equipoNombre}</strong> quedó inscrito en{' '}
+            El equipo <strong className="text-gray-800">{submittedData.equipoNombre}</strong> ya tiene cupo en{' '}
             <strong className="text-emerald-700">{submittedData.disciplina}</strong>.
           </p>
-          <div className="bg-gray-50 rounded-xl p-4 mb-6 text-sm text-gray-700 space-y-1">
+          <div className="bg-gray-50 rounded-xl p-4 mb-4 text-sm text-gray-700 space-y-1">
             <div className="flex justify-between">
-              <span>Jugadores registrados</span>
+              <span>Jugadores registrados ahora</span>
               <strong>{submittedData.totalJugadores}</strong>
             </div>
             <div className="flex justify-between">
-              <span>Total a pagar</span>
+              <span>Reserva de cupo</span>
               <strong className="text-emerald-700">{formatCOP(submittedData.totalPagarCOP)}</strong>
             </div>
           </div>
+          <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-4">
+            Los $10.000 no se devuelven: con ese pago separamos el espacio de tu equipo. Puedes completar el resto de jugadores más adelante con los coordinadores.
+          </p>
           <p className="text-xs text-gray-400 mb-6">
             Nos pondremos en contacto con el capitán para confirmar los detalles del torneo. ¡Nos vemos el{' '}
             {submittedData.disciplina === 'Voleibol' ? 'sábado 22' : 'domingo 23'} de agosto!
@@ -241,10 +238,27 @@ export default function TournamentForm() {
     <div className="bg-gray-50">
       <form onSubmit={handleSubmit(onSubmit)} className="max-w-2xl mx-auto px-4 py-8 space-y-5">
 
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5">
+          <h3 className="font-bold text-emerald-900 mb-2 text-base">💡 Reserva tu cupo con $10.000</h3>
+          <ul className="text-sm text-emerald-800 space-y-1.5 leading-relaxed">
+            <li>
+              <strong>No necesitas reunir a todo el equipo ni pagar por todos ahora.</strong> Con la inscripción
+              del capitán y el comprobante de $10.000 reservas el espacio.
+            </li>
+            <li>
+              Ese dinero <strong>no se devuelve</strong>: con él separamos el cupo y organizamos el torneo.
+            </li>
+            <li>
+              Puedes agregar más jugadores ahora o más adelante. El día del partido se recomienda al menos{' '}
+              {MINIMOS.Voleibol} en Voleibol y {MINIMOS['Microfútbol']} en Microfútbol.
+            </li>
+          </ul>
+        </div>
+
         {/* ── 1. Disciplina ── */}
         <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <h2 className="text-lg font-bold text-gray-900 mb-1">1. Selecciona la Disciplina</h2>
-          <p className="text-sm text-gray-500 mb-4">Cada disciplina tiene fecha, mínimo de jugadores y modalidad diferente.</p>
+          <p className="text-sm text-gray-500 mb-4">Cada disciplina tiene fecha y modalidad diferente. El cupo se reserva solo con el capitán.</p>
           <div className="grid grid-cols-2 gap-4">
             {(['Voleibol', 'Microfútbol'] as Disciplina[]).map((d) => (
               <label
@@ -259,7 +273,7 @@ export default function TournamentForm() {
                 <span className="text-4xl">{d === 'Voleibol' ? '🏐' : '⚽'}</span>
                 <span className="font-bold text-gray-900 text-base">{d}</span>
                 <span className="text-xs text-center text-gray-500">
-                  {d === 'Voleibol' ? 'Sáb. 22 Ago · Mín. 6 jug.' : 'Dom. 23 Ago · Mín. 5 jug.'}
+                  {d === 'Voleibol' ? `Sáb. 22 Ago · ${MINIMOS.Voleibol} en cancha` : `Dom. 23 Ago · ${MINIMOS['Microfútbol']} en cancha`}
                 </span>
                 <span className={`text-xs text-center font-semibold px-2 py-0.5 rounded-full ${
                   d === 'Voleibol'
@@ -313,7 +327,9 @@ export default function TournamentForm() {
         {/* ── 3. Datos del Capitán ── */}
         <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <h2 className="text-lg font-bold text-gray-900 mb-1">3. Datos del Capitán</h2>
-          <p className="text-sm text-gray-500 mb-4">El capitán cuenta como jugador en el total.</p>
+          <p className="text-sm text-gray-500 mb-4">
+            Con tus datos y $10.000 reservas el cupo del equipo. Este pago no es reembolsable.
+          </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Nombre completo *</label>
@@ -378,11 +394,12 @@ export default function TournamentForm() {
           <div className="flex items-center justify-between mb-1">
             <h2 className="text-lg font-bold text-gray-900">4. Jugadores</h2>
             <span className="text-sm font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
-              {totalJugadores} · {formatCOP(totalPagar)}
+              {totalJugadores} {totalJugadores === 1 ? 'jugador' : 'jugadores'}
             </span>
           </div>
           <p className="text-sm text-gray-500 mb-4">
-            Mínimo <strong>{MINIMOS[disciplina]}</strong> jugadores para {disciplina}. Los suplentes opcionales también pagan $10.000 c/u.
+            Opcional. Puedes reservar el cupo solo con el capitán y agregar al resto después. Si ya los tienes, añádelos acá.
+            El día del torneo se recomienda al menos <strong>{MINIMOS[disciplina]}</strong> jugadores para {disciplina}.
           </p>
           {disciplina === 'Voleibol' && (
             <div className="mb-4 flex gap-2.5 p-3 bg-purple-50 border border-purple-200 rounded-xl text-xs text-purple-700 leading-relaxed">
@@ -454,8 +471,7 @@ export default function TournamentForm() {
                 <button
                   type="button"
                   onClick={() => remove(index)}
-                  disabled={fields.length <= minAdicionales}
-                  className="mt-2.5 w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition disabled:opacity-25 disabled:cursor-not-allowed"
+                  className="mt-2.5 w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition"
                   title="Eliminar jugador"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -474,7 +490,7 @@ export default function TournamentForm() {
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            Agregar jugador suplente
+            Agregar jugador
           </button>
 
           {(() => {
@@ -496,22 +512,29 @@ export default function TournamentForm() {
             );
           })()}
 
-          <div className="mt-3 flex justify-between items-center p-4 bg-emerald-50 rounded-xl border border-emerald-100">
-            <span className="text-sm text-gray-600">
-              {totalJugadores} jugadores × $10.000 COP
-            </span>
-            <span className="text-base font-extrabold text-emerald-700">{formatCOP(totalPagar)}</span>
+          <div className="mt-3 p-4 bg-emerald-50 rounded-xl border border-emerald-100">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-700">Reserva de cupo (capitán)</span>
+              <span className="text-base font-extrabold text-emerald-700">{formatCOP(totalPagar)}</span>
+            </div>
+            <p className="text-xs text-emerald-700 mt-1.5">
+              No pagas por cada jugador ahora. Los $10.000 separan el espacio del equipo y no son reembolsables.
+            </p>
           </div>
         </section>
 
         {/* ── 5. Comprobante de Pago ── */}
         <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <h2 className="text-lg font-bold text-gray-900 mb-1">5. Comprobante de Pago</h2>
-          <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
-            <p className="font-semibold mb-1">💳 Realiza tu pago por {formatCOP(totalPagar)}</p>
+          <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 space-y-2">
+            <p className="font-semibold">💳 Paga $10.000 COP para reservar el cupo</p>
             <p>
-              Transfiere al medio de pago indicado por los coordinadores (Nequi / Daviplata / cuenta bancaria)
-              y adjunta el screenshot o foto del comprobante.
+              Transfiere el valor de <strong>una persona</strong> (el capitán) al medio indicado por los coordinadores
+              (Nequi / Daviplata / cuenta bancaria) y adjunta el screenshot o foto del comprobante.
+            </p>
+            <p>
+              Con ese pago separamos el espacio de tu equipo para organizar el torneo.{' '}
+              <strong>Este dinero no se devuelve.</strong>
             </p>
           </div>
           <label
@@ -559,6 +582,22 @@ export default function TournamentForm() {
                 />
               </div>
             </div>
+          )}
+
+          <label className="mt-4 flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              {...register('reservaNoReembolsableAceptada', {
+                required: 'Debes aceptar que la reserva de $10.000 no es reembolsable',
+              })}
+              className="mt-0.5 w-5 h-5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 flex-shrink-0"
+            />
+            <span className="text-sm text-gray-700">
+              Entiendo que los $10.000 del capitán reservan el cupo del equipo y <strong>no son reembolsables</strong>.
+            </span>
+          </label>
+          {errors.reservaNoReembolsableAceptada && (
+            <p className="text-red-500 text-sm mt-2">{errors.reservaNoReembolsableAceptada.message}</p>
           )}
         </section>
 
@@ -625,10 +664,10 @@ export default function TournamentForm() {
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
-              Registrando equipo…
+              Reservando cupo…
             </>
           ) : (
-            `Inscribir Equipo — ${formatCOP(totalPagar)}`
+            `Reservar cupo — ${formatCOP(totalPagar)}`
           )}
         </button>
 

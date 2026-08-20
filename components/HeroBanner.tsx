@@ -42,6 +42,9 @@ export default function HeroBanner() {
           Coordinadores: Dimas Mendoza &amp; Jefferson Morales
         </p>
         <p className="mt-3 mx-auto max-w-md text-emerald-100/90 text-xs leading-relaxed">
+          Reserva el cupo de tu equipo con $10.000 del capitán. No necesitas reunir ni pagar a todo el equipo ahora. El pago no es reembolsable.
+        </p>
+        <p className="mt-2 mx-auto max-w-md text-emerald-200/80 text-xs leading-relaxed">
           Este torneo es un espacio de integración y sana convivencia. No se admiten jugadores piratas ni semiprofesionales.
         </p>
       </div>
