@@ -27,6 +27,13 @@ function formatDate(timestamp: Inscripcion['createdAt']): string {
   }).format(date);
 }
 
+function isLikelyImage(url: string): boolean {
+  if (!url) return false;
+  if (/\.pdf(\?|#|$)/i.test(url)) return false;
+  if (/\.(jpe?g|png|gif|webp|avif|bmp)(\?|#|$)/i.test(url)) return true;
+  return url.includes('res.cloudinary.com');
+}
+
 function exportToCSV(data: Inscripcion[]) {
   const headers = [
     '#',
@@ -39,7 +46,9 @@ function exportToCSV(data: Inscripcion[]) {
     'WhatsApp',
     'Email',
     'Total Jugadores',
-    'Total a Pagar COP',
+    'Monto Original COP',
+    'Monto Abonado COP',
+    'Pago Verificado',
     'Comprobante URL',
     'Jugadores',
   ];
@@ -55,7 +64,9 @@ function exportToCSV(data: Inscripcion[]) {
     ins.capitan.telefono,
     ins.capitan.email,
     ins.totalJugadores,
+    ins.montoOriginalCOP ?? ins.totalPagarCOP,
     ins.totalPagarCOP,
+    ins.pagoVerificado ? 'Sí' : 'Pendiente',
     ins.comprobanteUrl,
     ins.jugadores.map((j) => `${j.nombre} (${j.documento})${j.genero ? ` [${j.genero === 'Masculino' ? 'M' : 'F'}]` : ''}${j.esCapitan ? ' [C]' : ''}`).join(' | '),
   ]);
@@ -82,9 +93,10 @@ interface PlayerModalProps {
   inscripcion: Inscripcion;
   onClose: () => void;
   onUpdateTotal: (id: string, totalPagarCOP: number) => Promise<void>;
+  onReviewPayment: () => void;
 }
 
-function PlayerModal({ inscripcion, onClose, onUpdateTotal }: PlayerModalProps) {
+function PlayerModal({ inscripcion, onClose, onUpdateTotal, onReviewPayment }: PlayerModalProps) {
   const [editingTotal, setEditingTotal] = useState(false);
   const [totalInput, setTotalInput] = useState(String(inscripcion.totalPagarCOP));
   const [savingTotal, setSavingTotal] = useState(false);
@@ -247,13 +259,22 @@ function PlayerModal({ inscripcion, onClose, onUpdateTotal }: PlayerModalProps) 
             <div className="flex items-center justify-between gap-3">
               <span className="text-sm font-medium text-gray-700">Total abonado</span>
               {!editingTotal && (
-                <button
-                  type="button"
-                  onClick={startEditingTotal}
-                  className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-100 transition"
-                >
-                  Editar
-                </button>
+                <div className="flex gap-1.5 flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={onReviewPayment}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-100 transition"
+                  >
+                    Ver comprobante
+                  </button>
+                  <button
+                    type="button"
+                    onClick={startEditingTotal}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-100 transition"
+                  >
+                    Editar
+                  </button>
+                </div>
               )}
             </div>
 
@@ -323,6 +344,172 @@ function PlayerModal({ inscripcion, onClose, onUpdateTotal }: PlayerModalProps) 
             </svg>
             Ver Comprobante de Pago
           </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface PaymentReviewModalProps {
+  inscripcion: Inscripcion;
+  onClose: () => void;
+  onSave: (id: string, totalPagarCOP: number) => Promise<void>;
+}
+
+function PaymentReviewModal({ inscripcion, onClose, onSave }: PaymentReviewModalProps) {
+  const original = inscripcion.montoOriginalCOP ?? inscripcion.totalPagarCOP;
+  const [amountInput, setAmountInput] = useState(String(inscripcion.totalPagarCOP));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [imageFailed, setImageFailed] = useState(false);
+  const showImage = isLikelyImage(inscripcion.comprobanteUrl) && !imageFailed;
+
+  const handleSave = async () => {
+    if (!inscripcion.id) return;
+    const parsed = Number(String(amountInput).replace(/[^\d]/g, ''));
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      setError('Ingresa un monto válido.');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      await onSave(inscripcion.id, parsed);
+      onClose();
+    } catch {
+      setError('No se pudo guardar. Inténtalo de nuevo.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4"
+      onClick={saving ? undefined : onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="p-6">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Revisar pago</h3>
+              <p className="text-sm text-gray-600 mt-0.5">
+                {inscripcion.equipoNombre} · {inscripcion.disciplina}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 transition flex-shrink-0"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <p className="text-sm text-gray-600 mb-4">
+            Revisa el comprobante y ajusta el valor al monto que realmente enviaron. Ese dato alimenta el control financiero del torneo.
+          </p>
+
+          <div className="mb-4 rounded-xl border border-gray-200 overflow-hidden bg-gray-50">
+            {showImage ? (
+              <a href={inscripcion.comprobanteUrl} target="_blank" rel="noopener noreferrer" className="block">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={inscripcion.comprobanteUrl}
+                  alt={`Comprobante de ${inscripcion.equipoNombre}`}
+                  className="w-full max-h-[360px] object-contain bg-gray-100"
+                  onError={() => setImageFailed(true)}
+                />
+              </a>
+            ) : (
+              <div className="p-6 text-center text-sm text-gray-500">
+                <p className="mb-3">No se pudo mostrar la imagen aquí.</p>
+                <a
+                  href={inscripcion.comprobanteUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-emerald-700 font-semibold hover:underline"
+                >
+                  Abrir comprobante
+                </a>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+            <div className="rounded-xl bg-gray-50 border border-gray-100 p-3.5">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Monto registrado</p>
+              <p className="text-lg font-extrabold text-gray-800 mt-1">{formatCOP(original)}</p>
+            </div>
+            <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3.5">
+              <p className="text-xs font-medium text-emerald-600 uppercase tracking-wide">Abonado actual</p>
+              <p className="text-lg font-extrabold text-emerald-800 mt-1">{formatCOP(inscripcion.totalPagarCOP)}</p>
+              {inscripcion.pagoVerificado ? (
+                <p className="text-xs font-semibold text-emerald-700 mt-1">Verificado</p>
+              ) : (
+                <p className="text-xs font-semibold text-amber-700 mt-1">Pendiente de revisar</p>
+              )}
+            </div>
+          </div>
+
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            Monto según el comprobante *
+          </label>
+          <div className="relative mb-2">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-400">
+              $
+            </span>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={amountInput}
+              onChange={(e) => setAmountInput(e.target.value.replace(/[^\d]/g, ''))}
+              className="w-full pl-7 pr-3 py-3 rounded-xl border border-gray-300 text-sm font-semibold text-gray-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none"
+              placeholder="Ej: 40000"
+              disabled={saving}
+              autoFocus
+            />
+          </div>
+          <p className="text-xs text-gray-500 mb-3">
+            Escribe solo números. Ejemplo: 10000, 20000, 40000.
+          </p>
+
+          {error && (
+            <p className="mb-3 text-sm text-red-700 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
+              {error}
+            </p>
+          )}
+
+          <div className="flex gap-2 justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              className="px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 transition"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 transition flex items-center gap-2"
+            >
+              {saving && (
+                <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              )}
+              {saving ? 'Guardando…' : 'Guardar monto'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -608,6 +795,7 @@ export default function AdminDashboard() {
   const [search, setSearch] = useState('');
   const [filterDisciplina, setFilterDisciplina] = useState<Disciplina | 'Todas'>('Todas');
   const [selected, setSelected] = useState<Inscripcion | null>(null);
+  const [paymentEdit, setPaymentEdit] = useState<Inscripcion | null>(null);
   const [pendingDelete, setPendingDelete] = useState<
     | { type: 'equipo'; item: Inscripcion }
     | { type: 'individual'; item: Individual }
@@ -674,11 +862,17 @@ export default function AdminDashboard() {
   };
 
   const handleUpdateTotal = async (id: string, totalPagarCOP: number) => {
-    await updateDoc(doc(db, 'inscripciones', id), { totalPagarCOP });
-    setInscripciones((prev) =>
-      prev.map((ins) => (ins.id === id ? { ...ins, totalPagarCOP } : ins))
-    );
-    setSelected((prev) => (prev?.id === id ? { ...prev, totalPagarCOP } : prev));
+    const current = inscripciones.find((ins) => ins.id === id);
+    const montoOriginalCOP = current?.montoOriginalCOP ?? current?.totalPagarCOP ?? totalPagarCOP;
+    await updateDoc(doc(db, 'inscripciones', id), {
+      totalPagarCOP,
+      montoOriginalCOP,
+      pagoVerificado: true,
+    });
+    const patch = { totalPagarCOP, montoOriginalCOP, pagoVerificado: true as const };
+    setInscripciones((prev) => prev.map((ins) => (ins.id === id ? { ...ins, ...patch } : ins)));
+    setSelected((prev) => (prev?.id === id ? { ...prev, ...patch } : prev));
+    setPaymentEdit((prev) => (prev?.id === id ? { ...prev, ...patch } : prev));
   };
 
   const filtered = useMemo(
@@ -703,7 +897,8 @@ export default function AdminDashboard() {
     const totalRecaudado = inscripciones.reduce((s, i) => s + i.totalPagarCOP, 0);
     const premio = Math.round(totalRecaudado * 0.3);
     const gananciaTorneo = totalRecaudado - premio;
-    return { voleibol, microfutbol, totalJugadores, totalRecaudado, premio, gananciaTorneo };
+    const pendientesPago = inscripciones.filter((i) => !i.pagoVerificado).length;
+    return { voleibol, microfutbol, totalJugadores, totalRecaudado, premio, gananciaTorneo, pendientesPago };
   }, [inscripciones]);
 
   if (loading) {
@@ -816,6 +1011,11 @@ service cloud.firestore {
         <div className="bg-amber-50 rounded-xl border border-amber-100 p-4">
           <p className="text-xs font-medium text-amber-600 uppercase tracking-wide mb-1">💰 Total recibido</p>
           <p className="text-xl font-extrabold text-amber-900">{formatCOP(stats.totalRecaudado)}</p>
+          {stats.pendientesPago > 0 && (
+            <p className="text-xs text-amber-700 mt-0.5">
+              {stats.pendientesPago} pago{stats.pendientesPago !== 1 ? 's' : ''} por revisar
+            </p>
+          )}
         </div>
         <div className="bg-violet-50 rounded-xl border border-violet-100 p-4">
           <p className="text-xs font-medium text-violet-600 uppercase tracking-wide mb-1">🏆 Premio (30%)</p>
@@ -913,7 +1113,7 @@ service cloud.firestore {
                   <th className="text-left px-4 py-3 font-semibold text-gray-500">WhatsApp</th>
                   <th className="text-center px-4 py-3 font-semibold text-gray-500">Jug.</th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-500">M / F</th>
-                  <th className="text-right px-4 py-3 font-semibold text-gray-500">Total</th>
+                  <th className="text-right px-4 py-3 font-semibold text-gray-500">Abonado</th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-500 whitespace-nowrap">Fecha</th>
                   <th className="text-center px-4 py-3 font-semibold text-gray-500">Acciones</th>
                 </tr>
@@ -964,8 +1164,26 @@ service cloud.firestore {
                         );
                       })()}
                     </td>
-                    <td className="px-4 py-3 text-right font-semibold text-gray-900 whitespace-nowrap">
-                      {formatCOP(ins.totalPagarCOP)}
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                      <button
+                        type="button"
+                        onClick={() => setPaymentEdit(ins)}
+                        className="inline-flex flex-col items-end gap-0.5 group"
+                        title="Revisar comprobante y ajustar monto"
+                      >
+                        <span className="font-semibold text-gray-900 group-hover:text-emerald-700">
+                          {formatCOP(ins.totalPagarCOP)}
+                        </span>
+                        <span
+                          className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+                            ins.pagoVerificado
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-amber-100 text-amber-700'
+                          }`}
+                        >
+                          {ins.pagoVerificado ? 'Verificado' : 'Por revisar'}
+                        </span>
+                      </button>
                     </td>
                     <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
                       {formatDate(ins.createdAt)}
@@ -993,6 +1211,21 @@ service cloud.firestore {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                           </svg>
                         </a>
+                        <button
+                          type="button"
+                          onClick={() => setPaymentEdit(ins)}
+                          className="w-8 h-8 flex items-center justify-center rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition"
+                          title="Revisar pago"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"
+                            />
+                          </svg>
+                        </button>
                         <button
                           type="button"
                           onClick={() => {
@@ -1026,6 +1259,14 @@ service cloud.firestore {
           inscripcion={selected}
           onClose={() => setSelected(null)}
           onUpdateTotal={handleUpdateTotal}
+          onReviewPayment={() => setPaymentEdit(selected)}
+        />
+      )}
+      {paymentEdit && (
+        <PaymentReviewModal
+          inscripcion={paymentEdit}
+          onClose={() => setPaymentEdit(null)}
+          onSave={handleUpdateTotal}
         />
       )}
       </>

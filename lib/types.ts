@@ -33,6 +33,8 @@ export interface Inscripcion {
   reglamentoAceptado: boolean;
   reservaCupo?: boolean;
   reservaNoReembolsableAceptada?: boolean;
+  montoOriginalCOP?: number;
+  pagoVerificado?: boolean;
   createdAt?: Timestamp;
 }
 
