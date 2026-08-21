@@ -9,13 +9,13 @@ export default function HeroBanner() {
           ⚡ Torneo Ágape 2026
         </h1>
         <a
-          href="https://www.google.com/maps/place/Parque+La+Ponderosa/@4.6111452,-74.1188985,17z/data=!3m1!4b1!4m6!3m5!1s0x8e3f994bc4d0b4e7:0x1ac3b2231dfafae3!8m2!3d4.6111452!4d-74.1188985!16s%2Fg%2F1ptzrlkk1?entry=ttu&g_ep=EgoyMDI2MDgxMS4wIKXMDSoASAFQAw%3D%3D"
+          href="https://maps.app.goo.gl/Lf45ko5k6eujYWK6A"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 text-emerald-200 hover:text-white text-lg mb-4 transition-colors group"
         >
           <span>📍</span>
-          <span className="group-hover:underline">Parque La Ponderosa, Bogotá</span>
+          <span className="group-hover:underline">Carrera 56, Provivienda Oriental, Bogotá</span>
           <svg
             className="w-4 h-4 opacity-70 group-hover:opacity-100 transition-opacity"
             fill="none"

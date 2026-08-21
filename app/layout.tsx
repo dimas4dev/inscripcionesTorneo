@@ -9,7 +9,7 @@ const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "https://inscripcionestorne
 export const metadata: Metadata = {
   title: "Torneo Ágape 2026 — Inscripciones",
   description:
-    "Registra tu equipo en el Torneo Ágape 2026. 🏐 Voleibol el 22 Ago y ⚽ Microfútbol el 23 Ago en el Parque La Ponderosa, Bogotá. El Ministerio Ordóñez.",
+    "Registra tu equipo en el Torneo Ágape 2026. 🏐 Voleibol el 22 Ago y ⚽ Microfútbol el 23 Ago en Carrera 56, Provivienda Oriental, Bogotá. El Ministerio Ordóñez.",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "⚡ Torneo Ágape 2026 — ¡Inscribe tu equipo!",
     description:
-      "🏐 Voleibol (22 Ago) · ⚽ Microfútbol (23 Ago) · Parque La Ponderosa, Bogotá · El Ministerio Ordóñez · $10.000 COP reserva el cupo de tu equipo",
+      "🏐 Voleibol (22 Ago) · ⚽ Microfútbol (23 Ago) · Carrera 56, Provivienda Oriental, Bogotá · El Ministerio Ordóñez · $10.000 COP reserva el cupo de tu equipo",
     url: BASE_URL,
     siteName: "Torneo Ágape 2026",
     images: [
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "⚡ Torneo Ágape 2026 — ¡Inscribe tu equipo!",
     description:
-      "🏐 Voleibol (22 Ago) · ⚽ Microfútbol (23 Ago) · Parque La Ponderosa, Bogotá",
+      "🏐 Voleibol (22 Ago) · ⚽ Microfútbol (23 Ago) · Carrera 56, Provivienda Oriental, Bogotá",
     images: [`${BASE_URL}/og-image.png`],
   },
 };

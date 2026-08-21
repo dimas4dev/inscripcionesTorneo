@@ -4,7 +4,7 @@ Web App de inscripción para el **Torneo Ágape 2026** del Ministerio Jahems y E
 
 - **Voleibol** · Sábado 22 de Agosto de 2026
 - **Microfútbol** · Domingo 23 de Agosto de 2026
-- **Ubicación:** Parque La Ponderosa, Bogotá
+- **Ubicación:** Carrera 56, Provivienda Oriental, Bogotá
 - **Costo:** $10.000 COP / jugador
 - **Coordinadores:** Dimas Mendoza & Jefferson Morales
 
