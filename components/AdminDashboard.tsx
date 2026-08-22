@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, type ReactNode } from 'react';
 import { collection, deleteDoc, doc, getDocs, query, orderBy, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Inscripcion, Individual, Disciplina } from '@/lib/types';
+import { Inscripcion, Individual, Disciplina, Genero, Jugador, Capitan } from '@/lib/types';
 
 const MINIMOS: Record<Disciplina, number> = { Voleibol: 6, 'Microfútbol': 5 };
 
@@ -32,6 +32,57 @@ function isLikelyImage(url: string): boolean {
   if (/\.pdf(\?|#|$)/i.test(url)) return false;
   if (/\.(jpe?g|png|gif|webp|avif|bmp)(\?|#|$)/i.test(url)) return true;
   return url.includes('res.cloudinary.com');
+}
+
+function generateId(): string {
+  return Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
+}
+
+function GenderToggle({
+  value,
+  onChange,
+}: {
+  value: Genero;
+  onChange: (g: Genero) => void;
+}) {
+  return (
+    <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-semibold">
+      {(['Masculino', 'Femenino'] as Genero[]).map((g) => (
+        <button
+          key={g}
+          type="button"
+          onClick={() => onChange(g)}
+          className={`flex-1 px-3 py-2 transition-colors ${
+            value === g
+              ? g === 'Masculino'
+                ? 'bg-blue-500 text-white'
+                : 'bg-rose-500 text-white'
+              : 'bg-white text-gray-500 hover:bg-gray-50'
+          }`}
+        >
+          {g === 'Masculino' ? '♂ M' : '♀ F'}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function cloneRoster(ins: Inscripcion): Jugador[] {
+  const list = (ins.jugadores ?? []).map((j) => ({
+    ...j,
+    id: j.id || generateId(),
+    genero: j.genero ?? 'Masculino',
+  }));
+  if (!list.some((j) => j.esCapitan)) {
+    list.unshift({
+      id: generateId(),
+      nombre: ins.capitan.nombre,
+      documento: ins.capitan.documento,
+      esCapitan: true,
+      genero: ins.capitan.genero ?? 'Masculino',
+    });
+  }
+  return list;
 }
 
 function exportToCSV(data: Inscripcion[]) {
@@ -94,13 +145,30 @@ interface PlayerModalProps {
   onClose: () => void;
   onUpdateTotal: (id: string, totalPagarCOP: number) => Promise<void>;
   onReviewPayment: () => void;
+  onUpdateRoster: (
+    id: string,
+    data: { equipoNombre: string; jugadores: Jugador[]; capitan: Capitan }
+  ) => Promise<void>;
+  startEditingRoster?: boolean;
 }
 
-function PlayerModal({ inscripcion, onClose, onUpdateTotal, onReviewPayment }: PlayerModalProps) {
+function PlayerModal({
+  inscripcion,
+  onClose,
+  onUpdateTotal,
+  onReviewPayment,
+  onUpdateRoster,
+  startEditingRoster = false,
+}: PlayerModalProps) {
   const [editingTotal, setEditingTotal] = useState(false);
   const [totalInput, setTotalInput] = useState(String(inscripcion.totalPagarCOP));
   const [savingTotal, setSavingTotal] = useState(false);
   const [totalError, setTotalError] = useState('');
+  const [editingRoster, setEditingRoster] = useState(startEditingRoster);
+  const [equipoNombre, setEquipoNombre] = useState(inscripcion.equipoNombre);
+  const [draftPlayers, setDraftPlayers] = useState<Jugador[]>(() => cloneRoster(inscripcion));
+  const [savingRoster, setSavingRoster] = useState(false);
+  const [rosterError, setRosterError] = useState('');
 
   const startEditingTotal = () => {
     setTotalInput(String(inscripcion.totalPagarCOP));
@@ -133,20 +201,110 @@ function PlayerModal({ inscripcion, onClose, onUpdateTotal, onReviewPayment }: P
     }
   };
 
+  const startRosterEdit = () => {
+    setEquipoNombre(inscripcion.equipoNombre);
+    setDraftPlayers(cloneRoster(inscripcion));
+    setRosterError('');
+    setEditingRoster(true);
+  };
+
+  const cancelRosterEdit = () => {
+    setEditingRoster(false);
+    setEquipoNombre(inscripcion.equipoNombre);
+    setDraftPlayers(cloneRoster(inscripcion));
+    setRosterError('');
+  };
+
+  const updatePlayer = (index: number, patch: Partial<Jugador>) => {
+    setDraftPlayers((prev) => prev.map((j, i) => (i === index ? { ...j, ...patch } : j)));
+  };
+
+  const addPlayer = () => {
+    setDraftPlayers((prev) => [
+      ...prev,
+      { id: generateId(), nombre: '', documento: '', esCapitan: false, genero: 'Masculino' },
+    ]);
+  };
+
+  const removePlayer = (index: number) => {
+    setDraftPlayers((prev) => prev.filter((j, i) => i !== index || j.esCapitan));
+  };
+
+  const handleSaveRoster = async () => {
+    if (!inscripcion.id) return;
+    const nombreEquipo = equipoNombre.trim();
+    if (nombreEquipo.length < 3) {
+      setRosterError('El nombre del equipo debe tener al menos 3 caracteres.');
+      return;
+    }
+    const capitanJugador = draftPlayers.find((j) => j.esCapitan);
+    if (!capitanJugador?.nombre.trim()) {
+      setRosterError('El capitán debe tener nombre.');
+      return;
+    }
+    const jugadores = draftPlayers
+      .map((j) => ({
+        ...j,
+        nombre: j.nombre.trim(),
+        documento: j.documento.trim(),
+      }))
+      .filter((j) => j.esCapitan || j.nombre !== '');
+    const extrasSinNombre = draftPlayers.filter((j) => !j.esCapitan && j.nombre.trim() === '');
+    if (extrasSinNombre.length > 0 && extrasSinNombre.some((j) => j.documento.trim() !== '')) {
+      setRosterError('Cada jugador adicional debe tener al menos el nombre.');
+      return;
+    }
+
+    const capitan: Capitan = {
+      ...inscripcion.capitan,
+      nombre: capitanJugador.nombre.trim(),
+      documento: capitanJugador.documento.trim() || inscripcion.capitan.documento,
+      genero: capitanJugador.genero,
+    };
+
+    setSavingRoster(true);
+    setRosterError('');
+    try {
+      await onUpdateRoster(inscripcion.id, {
+        equipoNombre: nombreEquipo,
+        jugadores,
+        capitan,
+      });
+      setEditingRoster(false);
+    } catch {
+      setRosterError('No se pudo guardar la plantilla. Inténtalo de nuevo.');
+    } finally {
+      setSavingRoster(false);
+    }
+  };
+
+  const minRecomendado = MINIMOS[inscripcion.disciplina];
+  const plantillaIncompleta = inscripcion.totalJugadores < minRecomendado;
+
   return (
     <div
       className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[88vh] overflow-y-auto"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[88vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-6">
           {/* Header */}
           <div className="flex items-start justify-between mb-4">
-            <div>
-              <h3 className="text-lg font-bold text-gray-900">{inscripcion.equipoNombre}</h3>
+            <div className="flex-1 min-w-0 pr-3">
+              {editingRoster ? (
+                <input
+                  type="text"
+                  value={equipoNombre}
+                  onChange={(e) => setEquipoNombre(e.target.value)}
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm font-bold text-gray-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none"
+                  placeholder="Nombre del equipo"
+                />
+              ) : (
+                <h3 className="text-lg font-bold text-gray-900">{inscripcion.equipoNombre}</h3>
+              )}
               <span
                 className={`inline-flex items-center gap-1 mt-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                   inscripcion.disciplina === 'Voleibol'
@@ -191,9 +349,26 @@ function PlayerModal({ inscripcion, onClose, onUpdateTotal, onReviewPayment }: P
           </div>
 
           {/* Lista de jugadores */}
-          <h4 className="font-semibold text-gray-900 mb-2">
-            Lista de Jugadores ({inscripcion.totalJugadores})
-          </h4>
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <h4 className="font-semibold text-gray-900">
+              Lista de Jugadores ({editingRoster ? draftPlayers.filter((j) => j.esCapitan || j.nombre.trim()).length : inscripcion.totalJugadores})
+            </h4>
+            {!editingRoster && (
+              <button
+                type="button"
+                onClick={startRosterEdit}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition"
+              >
+                Editar plantilla
+              </button>
+            )}
+          </div>
+          {plantillaIncompleta && !editingRoster && (
+            <p className="mb-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+              Solo está el capitán o faltan nombres. Se recomienda al menos {minRecomendado} jugadores para{' '}
+              {inscripcion.disciplina}. Usa <strong>Editar plantilla</strong> para agregarlos.
+            </p>
+          )}
           {/* Resumen M/F */}
           {(() => {
             const masc = inscripcion.jugadores.filter((j) => j.genero === 'Masculino').length;
@@ -216,43 +391,133 @@ function PlayerModal({ inscripcion, onClose, onUpdateTotal, onReviewPayment }: P
             );
           })()}
           <div className="space-y-2">
-            {inscripcion.jugadores.map((j, i) => (
+            {(editingRoster ? draftPlayers : inscripcion.jugadores).map((j, i) => (
               <div
-                key={j.id}
-                className={`flex items-center gap-3 p-3 rounded-xl ${
+                key={j.id || `${j.nombre}-${i}`}
+                className={`p-3 rounded-xl ${
                   j.esCapitan ? 'bg-emerald-50 border border-emerald-200' : 'bg-gray-50'
                 }`}
               >
-                <span
-                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                    j.esCapitan ? 'bg-emerald-500 text-white' : 'bg-gray-300 text-gray-600'
-                  }`}
-                >
-                  {j.esCapitan ? 'C' : i + 1}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">{j.nombre}</p>
-                  <p className="text-xs text-gray-500">Doc: {j.documento}</p>
-                </div>
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  {j.genero && (
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                      j.genero === 'Masculino'
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'bg-rose-100 text-rose-600'
-                    }`}>
-                      {j.genero === 'Masculino' ? '♂ M' : '♀ F'}
+                {editingRoster ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                          j.esCapitan ? 'bg-emerald-500 text-white' : 'bg-gray-300 text-gray-600'
+                        }`}
+                      >
+                        {j.esCapitan ? 'C' : i + 1}
+                      </span>
+                      <input
+                        type="text"
+                        value={j.nombre}
+                        onChange={(e) => updatePlayer(i, { nombre: e.target.value })}
+                        placeholder={j.esCapitan ? 'Nombre del capitán' : 'Nombre del jugador'}
+                        className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none"
+                      />
+                      {!j.esCapitan && (
+                        <button
+                          type="button"
+                          onClick={() => removePlayer(i)}
+                          className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition"
+                          title="Quitar jugador"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      value={j.documento}
+                      onChange={(e) => updatePlayer(i, { documento: e.target.value })}
+                      placeholder="Documento (opcional)"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none"
+                    />
+                    <GenderToggle
+                      value={j.genero ?? 'Masculino'}
+                      onChange={(g) => updatePlayer(i, { genero: g })}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                        j.esCapitan ? 'bg-emerald-500 text-white' : 'bg-gray-300 text-gray-600'
+                      }`}
+                    >
+                      {j.esCapitan ? 'C' : i + 1}
                     </span>
-                  )}
-                  {j.esCapitan && (
-                    <span className="text-xs font-semibold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
-                      Capitán
-                    </span>
-                  )}
-                </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{j.nombre}</p>
+                      <p className="text-xs text-gray-500">Doc: {j.documento || '—'}</p>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {j.genero && (
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                          j.genero === 'Masculino'
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-rose-100 text-rose-600'
+                        }`}>
+                          {j.genero === 'Masculino' ? '♂ M' : '♀ F'}
+                        </span>
+                      )}
+                      {j.esCapitan && (
+                        <span className="text-xs font-semibold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
+                          Capitán
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
+
+          {editingRoster && (
+            <div className="mt-3 space-y-3">
+              <button
+                type="button"
+                onClick={addPlayer}
+                className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 rounded-xl py-2.5 text-sm font-medium text-gray-500 hover:border-emerald-400 hover:text-emerald-600 hover:bg-emerald-50 transition"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Agregar jugador
+              </button>
+              {rosterError && (
+                <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-2.5 py-1.5">
+                  {rosterError}
+                </p>
+              )}
+              <div className="flex gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={cancelRosterEdit}
+                  disabled={savingRoster}
+                  className="px-3 py-2 rounded-xl text-xs font-semibold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveRoster}
+                  disabled={savingRoster}
+                  className="px-3 py-2 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {savingRoster && (
+                    <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                  )}
+                  {savingRoster ? 'Guardando…' : 'Guardar plantilla'}
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Total abonado */}
           <div className="mt-4 p-3.5 bg-emerald-50 rounded-xl border border-emerald-100 space-y-3">
@@ -785,9 +1050,130 @@ function IndividualesPanel({ individuales, onRefresh, onRequestDelete }: Individ
   );
 }
 
+type FinanceSlice = {
+  equipos: number;
+  jugadores: number;
+  recaudado: number;
+  premio: number;
+  ganancia: number;
+  pendientesPago: number;
+};
+
+interface FinanzasPanelProps {
+  voleibol: FinanceSlice;
+  microfutbol: FinanceSlice;
+  recaudadoTotal: number;
+  premioTotal: number;
+  gananciaTotal: number;
+  totalEquipos: number;
+  pendientesPago: number;
+}
+
+function FinanzasPanel({
+  voleibol,
+  microfutbol,
+  recaudadoTotal,
+  premioTotal,
+  gananciaTotal,
+  totalEquipos,
+  pendientesPago,
+}: FinanzasPanelProps) {
+  return (
+    <div className="space-y-5">
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+        <h2 className="text-base font-bold text-gray-900 mb-1">Consolidado de los dos torneos</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Recaudo total y ganancia sumando voleibol y microfútbol. El premio de cada disciplina se calcula aparte (30% de lo recaudado en ese torneo).
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="rounded-xl bg-amber-50 border border-amber-100 p-4">
+            <p className="text-xs font-medium text-amber-700 uppercase tracking-wide">Recaudado de todos</p>
+            <p className="text-2xl font-extrabold text-amber-900 mt-1">{formatCOP(recaudadoTotal)}</p>
+            <p className="text-xs text-amber-700 mt-1">{totalEquipos} equipos inscritos</p>
+          </div>
+          <div className="rounded-xl bg-violet-50 border border-violet-100 p-4">
+            <p className="text-xs font-medium text-violet-700 uppercase tracking-wide">Premios (suma de cada torneo)</p>
+            <p className="text-2xl font-extrabold text-violet-900 mt-1">{formatCOP(premioTotal)}</p>
+            <p className="text-xs text-violet-700 mt-1">30% voleibol + 30% microfútbol</p>
+          </div>
+          <div className="rounded-xl bg-teal-50 border border-teal-100 p-4">
+            <p className="text-xs font-medium text-teal-700 uppercase tracking-wide">Ganancia de los dos torneos</p>
+            <p className="text-2xl font-extrabold text-teal-900 mt-1">{formatCOP(gananciaTotal)}</p>
+            <p className="text-xs text-teal-700 mt-1">70% voleibol + 70% microfútbol</p>
+          </div>
+        </div>
+        {pendientesPago > 0 && (
+          <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 mt-4">
+            Hay {pendientesPago} pago{pendientesPago !== 1 ? 's' : ''} pendiente{pendientesPago !== 1 ? 's' : ''} de revisar. Ajusta los montos en Equipos para que estas cifras coincidan con los comprobantes.
+          </p>
+        )}
+      </div>
+
+      <div>
+        <h2 className="text-base font-bold text-gray-900 mb-3">Por torneo</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {([
+            {
+              key: 'voleibol',
+              emoji: '🏐',
+              label: 'Voleibol',
+              data: voleibol,
+              wrap: 'bg-emerald-50 border-emerald-100',
+              title: 'text-emerald-800',
+              muted: 'text-emerald-700',
+            },
+            {
+              key: 'microfutbol',
+              emoji: '⚽',
+              label: 'Microfútbol',
+              data: microfutbol,
+              wrap: 'bg-blue-50 border-blue-100',
+              title: 'text-blue-800',
+              muted: 'text-blue-700',
+            },
+          ] as const).map((torneo) => (
+            <div key={torneo.key} className={`rounded-xl border p-5 ${torneo.wrap}`}>
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div>
+                  <p className={`text-sm font-bold ${torneo.title}`}>
+                    {torneo.emoji} {torneo.label}
+                  </p>
+                  <p className={`text-xs mt-0.5 ${torneo.muted}`}>
+                    {torneo.data.equipos} equipo{torneo.data.equipos !== 1 ? 's' : ''} · {torneo.data.jugadores} jugador
+                    {torneo.data.jugadores !== 1 ? 'es' : ''}
+                  </p>
+                </div>
+                {torneo.data.pendientesPago > 0 && (
+                  <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-100 text-amber-800">
+                    {torneo.data.pendientesPago} por revisar
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <p className={`text-[11px] font-medium uppercase tracking-wide ${torneo.muted}`}>Recaudado</p>
+                  <p className={`text-lg font-extrabold ${torneo.title}`}>{formatCOP(torneo.data.recaudado)}</p>
+                </div>
+                <div>
+                  <p className={`text-[11px] font-medium uppercase tracking-wide ${torneo.muted}`}>Premio 30%</p>
+                  <p className={`text-lg font-extrabold ${torneo.title}`}>{formatCOP(torneo.data.premio)}</p>
+                </div>
+                <div>
+                  <p className={`text-[11px] font-medium uppercase tracking-wide ${torneo.muted}`}>Ganancia 70%</p>
+                  <p className={`text-lg font-extrabold ${torneo.title}`}>{formatCOP(torneo.data.ganancia)}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Dashboard principal ─────────────────────────────────────────────────────
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<'equipos' | 'individuales'>('equipos');
+  const [activeTab, setActiveTab] = useState<'equipos' | 'individuales' | 'finanzas'>('equipos');
   const [inscripciones, setInscripciones] = useState<Inscripcion[]>([]);
   const [individuales, setIndividuales] = useState<Individual[]>([]);
   const [loading, setLoading] = useState(true);
@@ -795,6 +1181,7 @@ export default function AdminDashboard() {
   const [search, setSearch] = useState('');
   const [filterDisciplina, setFilterDisciplina] = useState<Disciplina | 'Todas'>('Todas');
   const [selected, setSelected] = useState<Inscripcion | null>(null);
+  const [editRosterOnOpen, setEditRosterOnOpen] = useState(false);
   const [paymentEdit, setPaymentEdit] = useState<Inscripcion | null>(null);
   const [pendingDelete, setPendingDelete] = useState<
     | { type: 'equipo'; item: Inscripcion }
@@ -875,6 +1262,27 @@ export default function AdminDashboard() {
     setPaymentEdit((prev) => (prev?.id === id ? { ...prev, ...patch } : prev));
   };
 
+  const handleUpdateRoster = async (
+    id: string,
+    data: { equipoNombre: string; jugadores: Jugador[]; capitan: Capitan }
+  ) => {
+    await updateDoc(doc(db, 'inscripciones', id), {
+      equipoNombre: data.equipoNombre,
+      jugadores: data.jugadores,
+      capitan: data.capitan,
+      totalJugadores: data.jugadores.length,
+    });
+    const patch = {
+      equipoNombre: data.equipoNombre,
+      jugadores: data.jugadores,
+      capitan: data.capitan,
+      totalJugadores: data.jugadores.length,
+    };
+    setInscripciones((prev) => prev.map((ins) => (ins.id === id ? { ...ins, ...patch } : ins)));
+    setSelected((prev) => (prev?.id === id ? { ...prev, ...patch } : prev));
+    setPaymentEdit((prev) => (prev?.id === id ? { ...prev, ...patch } : prev));
+  };
+
   const filtered = useMemo(
     () =>
       inscripciones.filter((ins) => {
@@ -891,14 +1299,35 @@ export default function AdminDashboard() {
   );
 
   const stats = useMemo(() => {
-    const voleibol = inscripciones.filter((i) => i.disciplina === 'Voleibol').length;
-    const microfutbol = inscripciones.filter((i) => i.disciplina === 'Microfútbol').length;
-    const totalJugadores = inscripciones.reduce((s, i) => s + i.totalJugadores, 0);
-    const totalRecaudado = inscripciones.reduce((s, i) => s + i.totalPagarCOP, 0);
-    const premio = Math.round(totalRecaudado * 0.3);
-    const gananciaTorneo = totalRecaudado - premio;
-    const pendientesPago = inscripciones.filter((i) => !i.pagoVerificado).length;
-    return { voleibol, microfutbol, totalJugadores, totalRecaudado, premio, gananciaTorneo, pendientesPago };
+    const byDisciplina = (disciplina: Disciplina) => {
+      const lista = inscripciones.filter((i) => i.disciplina === disciplina);
+      const recaudado = lista.reduce((s, i) => s + i.totalPagarCOP, 0);
+      const premio = Math.round(recaudado * 0.3);
+      return {
+        equipos: lista.length,
+        jugadores: lista.reduce((s, i) => s + i.totalJugadores, 0),
+        recaudado,
+        premio,
+        ganancia: recaudado - premio,
+        pendientesPago: lista.filter((i) => !i.pagoVerificado).length,
+      };
+    };
+
+    const voleibol = byDisciplina('Voleibol');
+    const microfutbol = byDisciplina('Microfútbol');
+    const recaudadoTotal = voleibol.recaudado + microfutbol.recaudado;
+    const premioTotal = voleibol.premio + microfutbol.premio;
+    const gananciaTotal = voleibol.ganancia + microfutbol.ganancia;
+
+    return {
+      voleibol,
+      microfutbol,
+      recaudadoTotal,
+      premioTotal,
+      gananciaTotal,
+      totalEquipos: voleibol.equipos + microfutbol.equipos,
+      pendientesPago: voleibol.pendientesPago + microfutbol.pendientesPago,
+    };
   }, [inscripciones]);
 
   if (loading) {
@@ -953,6 +1382,7 @@ service cloud.firestore {
           {([
             { id: 'equipos', label: 'Equipos', count: inscripciones.length, icon: '🏆' },
             { id: 'individuales', label: 'Lista Individual', count: individuales.length, icon: '👤' },
+            { id: 'finanzas', label: 'Finanzas', count: null, icon: '💰' },
           ] as const).map((tab) => (
             <button
               key={tab.id}
@@ -965,11 +1395,13 @@ service cloud.firestore {
             >
               <span>{tab.icon}</span>
               {tab.label}
+              {tab.count !== null && (
               <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                 activeTab === tab.id ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'
               }`}>
                 {tab.count}
               </span>
+              )}
               {tab.id === 'individuales' && individuales.length > 0 && (() => {
                 const vComplete = individuales.filter(i => i.disciplina === 'Voleibol').length >= MINIMOS.Voleibol;
                 const mComplete = individuales.filter(i => i.disciplina === 'Microfútbol').length >= MINIMOS['Microfútbol'];
@@ -982,7 +1414,17 @@ service cloud.firestore {
         </div>
       </div>
 
-      {activeTab === 'individuales' ? (
+      {activeTab === 'finanzas' ? (
+        <FinanzasPanel
+          voleibol={stats.voleibol}
+          microfutbol={stats.microfutbol}
+          recaudadoTotal={stats.recaudadoTotal}
+          premioTotal={stats.premioTotal}
+          gananciaTotal={stats.gananciaTotal}
+          totalEquipos={stats.totalEquipos}
+          pendientesPago={stats.pendientesPago}
+        />
+      ) : activeTab === 'individuales' ? (
         <IndividualesPanel
           individuales={individuales}
           onRefresh={fetchData}
@@ -993,41 +1435,6 @@ service cloud.firestore {
         />
       ) : (
       <>
-      {/* Estadísticas */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Total Equipos</p>
-          <p className="text-3xl font-extrabold text-gray-900">{inscripciones.length}</p>
-          <p className="text-xs text-gray-400 mt-0.5">{stats.totalJugadores} jugadores registrados</p>
-        </div>
-        <div className="bg-emerald-50 rounded-xl border border-emerald-100 p-4">
-          <p className="text-xs font-medium text-emerald-600 uppercase tracking-wide mb-1">🏐 Voleibol</p>
-          <p className="text-3xl font-extrabold text-emerald-900">{stats.voleibol}</p>
-        </div>
-        <div className="bg-blue-50 rounded-xl border border-blue-100 p-4">
-          <p className="text-xs font-medium text-blue-600 uppercase tracking-wide mb-1">⚽ Microfútbol</p>
-          <p className="text-3xl font-extrabold text-blue-900">{stats.microfutbol}</p>
-        </div>
-        <div className="bg-amber-50 rounded-xl border border-amber-100 p-4">
-          <p className="text-xs font-medium text-amber-600 uppercase tracking-wide mb-1">💰 Total recibido</p>
-          <p className="text-xl font-extrabold text-amber-900">{formatCOP(stats.totalRecaudado)}</p>
-          {stats.pendientesPago > 0 && (
-            <p className="text-xs text-amber-700 mt-0.5">
-              {stats.pendientesPago} pago{stats.pendientesPago !== 1 ? 's' : ''} por revisar
-            </p>
-          )}
-        </div>
-        <div className="bg-violet-50 rounded-xl border border-violet-100 p-4">
-          <p className="text-xs font-medium text-violet-600 uppercase tracking-wide mb-1">🏆 Premio (30%)</p>
-          <p className="text-xl font-extrabold text-violet-900">{formatCOP(stats.premio)}</p>
-        </div>
-        <div className="bg-teal-50 rounded-xl border border-teal-100 p-4">
-          <p className="text-xs font-medium text-teal-600 uppercase tracking-wide mb-1">📈 Ganancia del torneo (70%)</p>
-          <p className="text-xl font-extrabold text-teal-900">{formatCOP(stats.gananciaTorneo)}</p>
-        </div>
-      </div>
-
-      {/* Buscador y filtros */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1 relative">
@@ -1148,9 +1555,22 @@ service cloud.firestore {
                       </a>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <span className="inline-flex items-center justify-center w-7 h-7 bg-gray-100 rounded-full text-xs font-bold text-gray-700">
-                        {ins.totalJugadores}
-                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditRosterOnOpen(true);
+                          setSelected(ins);
+                        }}
+                        className="inline-flex flex-col items-center gap-0.5"
+                        title="Editar plantilla"
+                      >
+                        <span className="inline-flex items-center justify-center w-7 h-7 bg-gray-100 rounded-full text-xs font-bold text-gray-700">
+                          {ins.totalJugadores}
+                        </span>
+                        {ins.totalJugadores < MINIMOS[ins.disciplina] && (
+                          <span className="text-[10px] font-semibold text-amber-700">Incompleta</span>
+                        )}
+                      </button>
                     </td>
                     <td className="px-4 py-3">
                       {(() => {
@@ -1191,9 +1611,12 @@ service cloud.firestore {
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-center gap-1.5">
                         <button
-                          onClick={() => setSelected(ins)}
+                          onClick={() => {
+                            setEditRosterOnOpen(false);
+                            setSelected(ins);
+                          }}
                           className="w-8 h-8 flex items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition"
-                          title="Ver jugadores"
+                          title="Ver / editar equipo"
                         >
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -1256,10 +1679,16 @@ service cloud.firestore {
 
       {selected && (
         <PlayerModal
+          key={`${selected.id}-${editRosterOnOpen ? 'edit' : 'view'}`}
           inscripcion={selected}
-          onClose={() => setSelected(null)}
+          onClose={() => {
+            setSelected(null);
+            setEditRosterOnOpen(false);
+          }}
           onUpdateTotal={handleUpdateTotal}
           onReviewPayment={() => setPaymentEdit(selected)}
+          onUpdateRoster={handleUpdateRoster}
+          startEditingRoster={editRosterOnOpen}
         />
       )}
       {paymentEdit && (
