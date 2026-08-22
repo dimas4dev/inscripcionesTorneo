@@ -20,6 +20,12 @@ export interface Jugador {
   genero: Genero;
 }
 
+export interface ComprobantePago {
+  id: string;
+  url: string;
+  nota?: string;
+}
+
 export interface Inscripcion {
   id?: string;
   equipoNombre: string;
@@ -30,6 +36,7 @@ export interface Inscripcion {
   totalJugadores: number;
   totalPagarCOP: number;
   comprobanteUrl: string;
+  comprobantes?: ComprobantePago[];
   reglamentoAceptado: boolean;
   reservaCupo?: boolean;
   reservaNoReembolsableAceptada?: boolean;

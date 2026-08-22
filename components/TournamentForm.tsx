@@ -5,6 +5,7 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Disciplina, Genero, FormValues } from '@/lib/types';
+import { uploadComprobante as uploadComprobanteFile } from '@/lib/uploadComprobante';
 
 const PRECIO_POR_JUGADOR = 10_000;
 const MINIMOS: Record<Disciplina, number> = { Voleibol: 6, 'Microfútbol': 5 };
@@ -97,42 +98,7 @@ export default function TournamentForm() {
   const totalPagar = PAGO_RESERVA;
 
   const uploadComprobante = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-      const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
-
-      if (!cloudName || !uploadPreset) {
-        reject(new Error('Configuración de Cloudinary incompleta.'));
-        return;
-      }
-
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('upload_preset', uploadPreset);
-      formData.append('folder', 'torneo-agape-2026/comprobantes');
-
-      const xhr = new XMLHttpRequest();
-
-      xhr.upload.addEventListener('progress', (e) => {
-        if (e.lengthComputable) {
-          setUploadProgress(Math.round((e.loaded / e.total) * 100));
-        }
-      });
-
-      xhr.addEventListener('load', () => {
-        if (xhr.status === 200) {
-          const data = JSON.parse(xhr.responseText);
-          resolve(data.secure_url);
-        } else {
-          reject(new Error('Error al subir el comprobante a Cloudinary.'));
-        }
-      });
-
-      xhr.addEventListener('error', () => reject(new Error('Error de red al subir el comprobante.')));
-
-      xhr.open('POST', `https://api.cloudinary.com/v1_1/${cloudName}/upload`);
-      xhr.send(formData);
-    });
+    return uploadComprobanteFile(file, setUploadProgress);
   };
 
   const onSubmit = async (data: FormValues) => {

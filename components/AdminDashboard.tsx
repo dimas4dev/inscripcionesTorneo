@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo, type ReactNode } from 'react';
 import { collection, deleteDoc, doc, getDocs, query, orderBy, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Inscripcion, Individual, Disciplina, Genero, Jugador, Capitan } from '@/lib/types';
+import { Inscripcion, Individual, Disciplina, Genero, Jugador, Capitan, ComprobantePago } from '@/lib/types';
+import { uploadComprobante } from '@/lib/uploadComprobante';
 
 const MINIMOS: Record<Disciplina, number> = { Voleibol: 6, 'Microfútbol': 5 };
 
@@ -85,6 +86,15 @@ function cloneRoster(ins: Inscripcion): Jugador[] {
   return list;
 }
 
+function listComprobantes(ins: Inscripcion): ComprobantePago[] {
+  const extras = ins.comprobantes ?? [];
+  const original = ins.comprobanteUrl
+    ? { id: 'reserva-capitan', url: ins.comprobanteUrl, nota: 'Reserva del capitán' }
+    : null;
+  const extraFiltered = extras.filter((c) => c.url !== ins.comprobanteUrl);
+  return original ? [original, ...extraFiltered] : extraFiltered;
+}
+
 function exportToCSV(data: Inscripcion[]) {
   const headers = [
     '#',
@@ -101,6 +111,7 @@ function exportToCSV(data: Inscripcion[]) {
     'Monto Abonado COP',
     'Pago Verificado',
     'Comprobante URL',
+    'Comprobantes extra',
     'Jugadores',
   ];
 
@@ -119,6 +130,7 @@ function exportToCSV(data: Inscripcion[]) {
     ins.totalPagarCOP,
     ins.pagoVerificado ? 'Sí' : 'Pendiente',
     ins.comprobanteUrl,
+    (ins.comprobantes ?? []).map((c) => `${c.nota ? `${c.nota}: ` : ''}${c.url}`).join(' | '),
     ins.jugadores.map((j) => `${j.nombre} (${j.documento})${j.genero ? ` [${j.genero === 'Masculino' ? 'M' : 'F'}]` : ''}${j.esCapitan ? ' [C]' : ''}`).join(' | '),
   ]);
 
@@ -530,7 +542,7 @@ function PlayerModal({
                     onClick={onReviewPayment}
                     className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-100 transition"
                   >
-                    Ver comprobante
+                    Ver comprobantes
                   </button>
                   <button
                     type="button"
@@ -598,17 +610,16 @@ function PlayerModal({
           </div>
 
           {/* Comprobante */}
-          <a
-            href={inscripcion.comprobanteUrl}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            type="button"
+            onClick={onReviewPayment}
             className="mt-3 flex items-center justify-center gap-2 w-full border border-gray-200 text-gray-700 font-semibold rounded-xl py-2.5 hover:bg-gray-50 transition text-sm"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
             </svg>
-            Ver Comprobante de Pago
-          </a>
+            Revisar y agregar comprobantes
+          </button>
         </div>
       </div>
     </div>
@@ -619,15 +630,30 @@ interface PaymentReviewModalProps {
   inscripcion: Inscripcion;
   onClose: () => void;
   onSave: (id: string, totalPagarCOP: number) => Promise<void>;
+  onAddComprobantes: (id: string, items: ComprobantePago[]) => Promise<void>;
+  onRemoveComprobante: (id: string, comprobanteId: string) => Promise<void>;
 }
 
-function PaymentReviewModal({ inscripcion, onClose, onSave }: PaymentReviewModalProps) {
+function PaymentReviewModal({
+  inscripcion,
+  onClose,
+  onSave,
+  onAddComprobantes,
+  onRemoveComprobante,
+}: PaymentReviewModalProps) {
   const original = inscripcion.montoOriginalCOP ?? inscripcion.totalPagarCOP;
+  const receipts = listComprobantes(inscripcion);
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const [amountInput, setAmountInput] = useState(String(inscripcion.totalPagarCOP));
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [nota, setNota] = useState('');
   const [error, setError] = useState('');
   const [imageFailed, setImageFailed] = useState(false);
-  const showImage = isLikelyImage(inscripcion.comprobanteUrl) && !imageFailed;
+
+  const selectedReceipt = receipts[Math.min(selectedIndex, Math.max(receipts.length - 1, 0))];
+  const showImage = selectedReceipt ? isLikelyImage(selectedReceipt.url) && !imageFailed : false;
 
   const handleSave = async () => {
     if (!inscripcion.id) return;
@@ -648,10 +674,57 @@ function PaymentReviewModal({ inscripcion, onClose, onSave }: PaymentReviewModal
     }
   };
 
+  const handleUpload = async (files: FileList | null) => {
+    if (!inscripcion.id || !files?.length) return;
+    const valid = Array.from(files).filter((file) => file.size <= 5 * 1024 * 1024);
+    if (valid.length === 0) {
+      setError('Cada archivo debe pesar máximo 5 MB.');
+      return;
+    }
+    setUploading(true);
+    setError('');
+    setUploadProgress(0);
+    try {
+      const uploaded: ComprobantePago[] = [];
+      for (let i = 0; i < valid.length; i++) {
+        const url = await uploadComprobante(valid[i], (pct) => {
+          const overall = Math.round(((i + pct / 100) / valid.length) * 100);
+          setUploadProgress(overall);
+        });
+        uploaded.push({
+          id: generateId(),
+          url,
+          nota: nota.trim() || undefined,
+        });
+      }
+      await onAddComprobantes(inscripcion.id, uploaded);
+      setNota('');
+      setSelectedIndex(receipts.length + uploaded.length - 1);
+      setImageFailed(false);
+    } catch {
+      setError('No se pudieron subir los comprobantes. Inténtalo de nuevo.');
+    } finally {
+      setUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
+  const handleRemove = async (comprobanteId: string) => {
+    if (!inscripcion.id || comprobanteId === 'reserva-capitan') return;
+    setError('');
+    try {
+      await onRemoveComprobante(inscripcion.id, comprobanteId);
+      setSelectedIndex(0);
+      setImageFailed(false);
+    } catch {
+      setError('No se pudo quitar el comprobante.');
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4"
-      onClick={saving ? undefined : onClose}
+      onClick={saving || uploading ? undefined : onClose}
     >
       <div
         className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto"
@@ -660,7 +733,7 @@ function PaymentReviewModal({ inscripcion, onClose, onSave }: PaymentReviewModal
         <div className="p-6">
           <div className="flex items-start justify-between mb-4">
             <div>
-              <h3 className="text-lg font-bold text-gray-900">Revisar pago</h3>
+              <h3 className="text-lg font-bold text-gray-900">Revisar pagos</h3>
               <p className="text-sm text-gray-600 mt-0.5">
                 {inscripcion.equipoNombre} · {inscripcion.disciplina}
               </p>
@@ -668,7 +741,7 @@ function PaymentReviewModal({ inscripcion, onClose, onSave }: PaymentReviewModal
             <button
               type="button"
               onClick={onClose}
-              disabled={saving}
+              disabled={saving || uploading}
               className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 transition flex-shrink-0"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -678,33 +751,110 @@ function PaymentReviewModal({ inscripcion, onClose, onSave }: PaymentReviewModal
           </div>
 
           <p className="text-sm text-gray-600 mb-4">
-            Revisa el comprobante y ajusta el valor al monto que realmente enviaron. Ese dato alimenta el control financiero del torneo.
+            Sube los comprobantes de quienes paguen después del capitán y ajusta el total abonado según todas las imágenes.
           </p>
 
-          <div className="mb-4 rounded-xl border border-gray-200 overflow-hidden bg-gray-50">
-            {showImage ? (
-              <a href={inscripcion.comprobanteUrl} target="_blank" rel="noopener noreferrer" className="block">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={inscripcion.comprobanteUrl}
-                  alt={`Comprobante de ${inscripcion.equipoNombre}`}
-                  className="w-full max-h-[360px] object-contain bg-gray-100"
-                  onError={() => setImageFailed(true)}
-                />
-              </a>
-            ) : (
-              <div className="p-6 text-center text-sm text-gray-500">
-                <p className="mb-3">No se pudo mostrar la imagen aquí.</p>
-                <a
-                  href={inscripcion.comprobanteUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-emerald-700 font-semibold hover:underline"
+          {receipts.length > 1 && (
+            <div className="flex gap-2 overflow-x-auto pb-3 mb-3">
+              {receipts.map((receipt, index) => (
+                <button
+                  key={receipt.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedIndex(index);
+                    setImageFailed(false);
+                  }}
+                  className={`flex-shrink-0 w-20 h-16 rounded-lg overflow-hidden border-2 ${
+                    selectedIndex === index ? 'border-emerald-500' : 'border-gray-200'
+                  }`}
+                  title={receipt.nota || `Comprobante ${index + 1}`}
                 >
-                  Abrir comprobante
-                </a>
+                  {isLikelyImage(receipt.url) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={receipt.url} alt="" className="w-full h-full object-cover bg-gray-100" />
+                  ) : (
+                    <span className="w-full h-full flex items-center justify-center text-[10px] font-semibold text-gray-500 bg-gray-50">
+                      PDF
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {selectedReceipt ? (
+            <div className="mb-4 rounded-xl border border-gray-200 overflow-hidden bg-gray-50">
+              <div className="flex items-center justify-between px-3 py-2 bg-white border-b border-gray-100">
+                <p className="text-xs font-semibold text-gray-600 truncate">
+                  {selectedReceipt.nota || (selectedReceipt.id === 'reserva-capitan' ? 'Reserva del capitán' : `Comprobante ${selectedIndex + 1}`)}
+                </p>
+                {selectedReceipt.id !== 'reserva-capitan' && (
+                  <button
+                    type="button"
+                    onClick={() => handleRemove(selectedReceipt.id)}
+                    className="text-xs font-semibold text-red-600 hover:text-red-700"
+                  >
+                    Quitar
+                  </button>
+                )}
               </div>
-            )}
+              {showImage ? (
+                <a href={selectedReceipt.url} target="_blank" rel="noopener noreferrer" className="block">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={selectedReceipt.url}
+                    alt={`Comprobante de ${inscripcion.equipoNombre}`}
+                    className="w-full max-h-[320px] object-contain bg-gray-100"
+                    onError={() => setImageFailed(true)}
+                  />
+                </a>
+              ) : (
+                <div className="p-6 text-center text-sm text-gray-500">
+                  <p className="mb-3">No se pudo mostrar el archivo aquí.</p>
+                  <a
+                    href={selectedReceipt.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-emerald-700 font-semibold hover:underline"
+                  >
+                    Abrir comprobante
+                  </a>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="mb-4 text-sm text-gray-500 bg-gray-50 rounded-xl p-4 text-center">
+              Este equipo aún no tiene comprobantes.
+            </p>
+          )}
+
+          <div className="mb-4 rounded-xl border border-dashed border-gray-300 p-4 bg-gray-50">
+            <p className="text-sm font-semibold text-gray-800 mb-1">Agregar más comprobantes</p>
+            <p className="text-xs text-gray-500 mb-3">
+              Úsalo cuando otros jugadores paguen después de la reserva del capitán. JPG, PNG o PDF · Máx. 5 MB c/u.
+            </p>
+            <input
+              type="text"
+              value={nota}
+              onChange={(e) => setNota(e.target.value)}
+              placeholder="Nota opcional: ej. pago de María / 3 jugadores"
+              disabled={uploading}
+              className="w-full mb-3 rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none"
+            />
+            <label className="flex items-center justify-center w-full rounded-xl bg-white border border-gray-200 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 cursor-pointer transition">
+              <input
+                type="file"
+                accept="image/*,.pdf"
+                multiple
+                className="sr-only"
+                disabled={uploading}
+                onChange={(e) => {
+                  void handleUpload(e.target.files);
+                  e.target.value = '';
+                }}
+              />
+              {uploading ? `Subiendo… ${uploadProgress}%` : 'Subir imágenes o PDF'}
+            </label>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
@@ -724,7 +874,7 @@ function PaymentReviewModal({ inscripcion, onClose, onSave }: PaymentReviewModal
           </div>
 
           <label className="block text-sm font-medium text-gray-700 mb-1.5">
-            Monto según el comprobante *
+            Total abonado según todos los comprobantes *
           </label>
           <div className="relative mb-2">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-400">
@@ -737,12 +887,11 @@ function PaymentReviewModal({ inscripcion, onClose, onSave }: PaymentReviewModal
               onChange={(e) => setAmountInput(e.target.value.replace(/[^\d]/g, ''))}
               className="w-full pl-7 pr-3 py-3 rounded-xl border border-gray-300 text-sm font-semibold text-gray-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none"
               placeholder="Ej: 40000"
-              disabled={saving}
-              autoFocus
+              disabled={saving || uploading}
             />
           </div>
           <p className="text-xs text-gray-500 mb-3">
-            Escribe solo números. Ejemplo: 10000, 20000, 40000.
+            Suma lo que ves en las imágenes. Ejemplo: 10000 del capitán + 30000 de otros = 40000.
           </p>
 
           {error && (
@@ -755,7 +904,7 @@ function PaymentReviewModal({ inscripcion, onClose, onSave }: PaymentReviewModal
             <button
               type="button"
               onClick={onClose}
-              disabled={saving}
+              disabled={saving || uploading}
               className="px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 transition"
             >
               Cancelar
@@ -763,7 +912,7 @@ function PaymentReviewModal({ inscripcion, onClose, onSave }: PaymentReviewModal
             <button
               type="button"
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || uploading}
               className="px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 transition flex items-center gap-2"
             >
               {saving && (
@@ -1283,7 +1432,23 @@ export default function AdminDashboard() {
     setPaymentEdit((prev) => (prev?.id === id ? { ...prev, ...patch } : prev));
   };
 
-  const filtered = useMemo(
+  const handleAddComprobantes = async (id: string, items: ComprobantePago[]) => {
+    const current = inscripciones.find((ins) => ins.id === id);
+    const comprobantes = [...(current?.comprobantes ?? []), ...items];
+    await updateDoc(doc(db, 'inscripciones', id), { comprobantes });
+    setInscripciones((prev) => prev.map((ins) => (ins.id === id ? { ...ins, comprobantes } : ins)));
+    setSelected((prev) => (prev?.id === id ? { ...prev, comprobantes } : prev));
+    setPaymentEdit((prev) => (prev?.id === id ? { ...prev, comprobantes } : prev));
+  };
+
+  const handleRemoveComprobante = async (id: string, comprobanteId: string) => {
+    const current = inscripciones.find((ins) => ins.id === id);
+    const comprobantes = (current?.comprobantes ?? []).filter((c) => c.id !== comprobanteId);
+    await updateDoc(doc(db, 'inscripciones', id), { comprobantes });
+    setInscripciones((prev) => prev.map((ins) => (ins.id === id ? { ...ins, comprobantes } : ins)));
+    setSelected((prev) => (prev?.id === id ? { ...prev, comprobantes } : prev));
+    setPaymentEdit((prev) => (prev?.id === id ? { ...prev, comprobantes } : prev));
+  };
     () =>
       inscripciones.filter((ins) => {
         const term = search.toLowerCase();
@@ -1627,7 +1792,7 @@ service cloud.firestore {
                           target="_blank"
                           rel="noopener noreferrer"
                           className="w-8 h-8 flex items-center justify-center rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition"
-                          title="Ver comprobante"
+                          title="Revisar comprobantes"
                         >
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -1637,8 +1802,8 @@ service cloud.firestore {
                         <button
                           type="button"
                           onClick={() => setPaymentEdit(ins)}
-                          className="w-8 h-8 flex items-center justify-center rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition"
-                          title="Revisar pago"
+                          className="w-8 h-8 flex items-center justify-center rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition relative"
+                          title="Revisar pagos y subir más comprobantes"
                         >
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path
@@ -1648,6 +1813,11 @@ service cloud.firestore {
                               d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"
                             />
                           </svg>
+                          {listComprobantes(ins).length > 1 && (
+                            <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-amber-600 text-white text-[9px] font-bold flex items-center justify-center">
+                              {listComprobantes(ins).length}
+                            </span>
+                          )}
                         </button>
                         <button
                           type="button"
@@ -1696,6 +1866,8 @@ service cloud.firestore {
           inscripcion={paymentEdit}
           onClose={() => setPaymentEdit(null)}
           onSave={handleUpdateTotal}
+          onAddComprobantes={handleAddComprobantes}
+          onRemoveComprobante={handleRemoveComprobante}
         />
       )}
       </>
