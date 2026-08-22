@@ -1449,6 +1449,8 @@ export default function AdminDashboard() {
     setSelected((prev) => (prev?.id === id ? { ...prev, comprobantes } : prev));
     setPaymentEdit((prev) => (prev?.id === id ? { ...prev, comprobantes } : prev));
   };
+
+  const filtered = useMemo(
     () =>
       inscripciones.filter((ins) => {
         const term = search.toLowerCase();
