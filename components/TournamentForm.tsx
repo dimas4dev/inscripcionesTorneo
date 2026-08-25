@@ -81,7 +81,7 @@ export default function TournamentForm() {
     formState: { errors },
   } = useForm<FormValues>({
     defaultValues: {
-      disciplina: 'Voleibol',
+      disciplina: 'Microfútbol',
       capitan: { nombre: '', documento: '', telefono: '', email: '', genero: 'Masculino' },
       jugadores: [],
       reglamentoAceptado: false,
@@ -102,6 +102,10 @@ export default function TournamentForm() {
   };
 
   const onSubmit = async (data: FormValues) => {
+    if (data.disciplina === 'Voleibol') {
+      setSubmitError('Las inscripciones de Voleibol ya están cerradas. El torneo se celebró.');
+      return;
+    }
     if (!comprobanteFile) {
       setSubmitError('Por favor adjunta el comprobante de pago.');
       return;
@@ -186,8 +190,7 @@ export default function TournamentForm() {
             Los $10.000 no se devuelven: con ese pago separamos el espacio de tu equipo. Puedes completar el resto de jugadores más adelante con los coordinadores.
           </p>
           <p className="text-xs text-gray-400 mb-6">
-            Nos pondremos en contacto con el capitán para confirmar los detalles del torneo. ¡Nos vemos el{' '}
-            {submittedData.disciplina === 'Voleibol' ? 'sábado 22' : 'domingo 23'} de agosto!
+            Nos pondremos en contacto con el capitán para confirmar los detalles del torneo de microfútbol mixto.
           </p>
           <button
             onClick={() => setSubmittedData(null)}
@@ -216,7 +219,7 @@ export default function TournamentForm() {
             </li>
             <li>
               Puedes agregar más jugadores ahora o más adelante. El día del partido se recomienda al menos{' '}
-              {MINIMOS.Voleibol} en Voleibol y {MINIMOS['Microfútbol']} en Microfútbol.
+              {MINIMOS['Microfútbol']} jugadores en Microfútbol.
             </li>
           </ul>
         </div>
@@ -224,49 +227,49 @@ export default function TournamentForm() {
         {/* ── 1. Disciplina ── */}
         <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <h2 className="text-lg font-bold text-gray-900 mb-1">1. Selecciona la Disciplina</h2>
-          <p className="text-sm text-gray-500 mb-4">Cada disciplina tiene fecha y modalidad diferente. El cupo se reserva solo con el capitán.</p>
+          <p className="text-sm text-gray-500 mb-4">El torneo de Voleibol ya se celebró. Ahora solo está abierta la inscripción de Microfútbol mixto.</p>
           <div className="grid grid-cols-2 gap-4">
-            {(['Voleibol', 'Microfútbol'] as Disciplina[]).map((d) => (
-              <label
-                key={d}
-                className={`relative cursor-pointer rounded-xl border-2 p-5 flex flex-col items-center gap-2 transition-all ${
-                  disciplina === d
-                    ? 'border-emerald-500 bg-emerald-50 shadow-sm'
-                    : 'border-gray-200 hover:border-gray-300 bg-white'
-                }`}
-              >
-                <input type="radio" value={d} {...register('disciplina')} className="sr-only" />
-                <span className="text-4xl">{d === 'Voleibol' ? '🏐' : '⚽'}</span>
-                <span className="font-bold text-gray-900 text-base">{d}</span>
-                <span className="text-xs text-center text-gray-500">
-                  {d === 'Voleibol' ? `Sáb. 22 Ago · ${MINIMOS.Voleibol} en cancha` : `Dom. 23 Ago · ${MINIMOS['Microfútbol']} en cancha`}
+            <div className="relative rounded-xl border-2 border-gray-200 bg-gray-50 p-5 flex flex-col items-center gap-2 opacity-60">
+              <span className="text-4xl">🏐</span>
+              <span className="font-bold text-gray-900 text-base">Voleibol</span>
+              <span className="text-xs text-center text-gray-500">Sáb. 22 Ago</span>
+              <span className="text-xs text-center font-semibold px-2 py-0.5 rounded-full bg-gray-200 text-gray-600">
+                Inscripciones cerradas
+              </span>
+            </div>
+            <label
+              className={`relative cursor-pointer rounded-xl border-2 p-5 flex flex-col items-center gap-2 transition-all ${
+                disciplina === 'Microfútbol'
+                  ? 'border-emerald-500 bg-emerald-50 shadow-sm'
+                  : 'border-gray-200 hover:border-gray-300 bg-white'
+              }`}
+            >
+              <input type="radio" value="Microfútbol" {...register('disciplina')} className="sr-only" />
+              <span className="text-4xl">⚽</span>
+              <span className="font-bold text-gray-900 text-base">Microfútbol</span>
+              <span className="text-xs text-center text-gray-500">
+                {MINIMOS['Microfútbol']} en cancha
+              </span>
+              <span className="text-xs text-center font-semibold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                👫 Mixto
+              </span>
+              {disciplina === 'Microfútbol' && (
+                <span className="absolute top-2.5 right-2.5 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center">
+                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
                 </span>
-                <span className={`text-xs text-center font-semibold px-2 py-0.5 rounded-full ${
-                  d === 'Voleibol'
-                    ? 'bg-purple-100 text-purple-700'
-                    : 'bg-blue-100 text-blue-700'
-                }`}>
-                  {d === 'Voleibol' ? '👫 Mixto' : '👨 Solo masculino'}
-                </span>
-                {disciplina === d && (
-                  <span className="absolute top-2.5 right-2.5 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center">
-                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </span>
-                )}
-              </label>
-            ))}
+              )}
+            </label>
           </div>
-          {/* Aviso de regla mixta para Voleibol */}
-          {disciplina === 'Voleibol' && (
+          {disciplina === 'Microfútbol' && (
             <div className="mt-4 flex gap-3 p-3.5 bg-purple-50 border border-purple-200 rounded-xl text-sm text-purple-800">
               <span className="text-lg flex-shrink-0">👫</span>
               <div>
                 <p className="font-semibold mb-0.5">Torneo Mixto — Regla de género en cancha</p>
                 <p className="leading-relaxed">
                   En todo momento debe haber al menos <strong>1 jugador/a del sexo opuesto</strong> en la cancha.
-                  Ejemplo: si hay 5 hombres en el court, debe haber mínimo 1 mujer; si hay 5 mujeres, debe haber mínimo 1 hombre.
+                  Ejemplo: si hay 4 hombres, debe haber mínimo 1 mujer; si hay 4 mujeres, debe haber mínimo 1 hombre.
                 </p>
               </div>
             </div>
@@ -367,19 +370,11 @@ export default function TournamentForm() {
             Opcional. Puedes reservar el cupo solo con el capitán y agregar al resto después. Si ya los tienes, añádelos acá.
             El día del torneo se recomienda al menos <strong>{MINIMOS[disciplina]}</strong> jugadores para {disciplina}.
           </p>
-          {disciplina === 'Voleibol' && (
+          {disciplina === 'Microfútbol' && (
             <div className="mb-4 flex gap-2.5 p-3 bg-purple-50 border border-purple-200 rounded-xl text-xs text-purple-700 leading-relaxed">
               <span className="flex-shrink-0">👫</span>
               <span>
                 <strong>Torneo Mixto:</strong> Registra jugadores y jugadoras. Recuerda que en cancha siempre debe haber al menos 1 persona del sexo opuesto a la mayoría.
-              </span>
-            </div>
-          )}
-          {disciplina === 'Microfútbol' && (
-            <div className="mb-4 flex gap-2.5 p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-700 leading-relaxed">
-              <span className="flex-shrink-0">👨</span>
-              <span>
-                <strong>Solo masculino:</strong> Esta categoría es exclusivamente para jugadores hombres.
               </span>
             </div>
           )}
@@ -582,14 +577,9 @@ export default function TournamentForm() {
                 integración y sana convivencia. Incumplir esta regla puede resultar en la exclusión del equipo.
               </p>
             </div>
-            {disciplina === 'Voleibol' && (
-              <p className="pt-1 border-t border-gray-200">
-                👫 <strong>Voleibol Mixto:</strong> En cancha siempre debe haber mínimo 1 jugador/a del sexo opuesto a la mayoría. Incumplir esta regla puede resultar en descalificación del punto o del set.
-              </p>
-            )}
             {disciplina === 'Microfútbol' && (
               <p className="pt-1 border-t border-gray-200">
-                👨 <strong>Microfútbol:</strong> Categoría exclusivamente masculina.
+                👫 <strong>Microfútbol Mixto:</strong> En cancha siempre debe haber mínimo 1 jugador/a del sexo opuesto a la mayoría. Incumplir esta regla puede resultar en descalificación del punto o del partido.
               </p>
             )}
           </div>

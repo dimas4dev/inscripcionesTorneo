@@ -6,7 +6,7 @@ Web App de inscripción para el **Torneo Ágape 2026** del Ministerio Jahems y E
 - **Microfútbol** · Domingo 23 de Agosto de 2026
 - **Ubicación:** Carrera 56, Provivienda Oriental, Bogotá
 - **Costo:** $10.000 COP / jugador
-- **Coordinadores:** Dimas Mendoza & Jefferson Morales
+- **Coordinadores:** Nicolás Mantilla, Jeronimo Roa y Lina Umana
 
 ---
 

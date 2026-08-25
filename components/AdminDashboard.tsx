@@ -1067,77 +1067,72 @@ interface IndividualsPanelProps {
 }
 
 function IndividualesPanel({ individuales, onRefresh, onRequestDelete }: IndividualsPanelProps) {
-  const porDisciplina = useMemo(() => ({
-    Voleibol: individuales.filter((i) => i.disciplina === 'Voleibol'),
-    'Microfútbol': individuales.filter((i) => i.disciplina === 'Microfútbol'),
-  }), [individuales]);
+  const lista = useMemo(
+    () => individuales.filter((i) => i.disciplina === 'Microfútbol'),
+    [individuales]
+  );
+  const count = lista.length;
+  const min = MINIMOS['Microfútbol'];
+  const pct = Math.min((count / min) * 100, 100);
+  const complete = count >= min;
+  const masc = lista.filter((p) => p.genero === 'Masculino').length;
+  const fem = lista.filter((p) => p.genero === 'Femenino').length;
 
   return (
     <div className="space-y-5">
+      <p className="text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">
+        El voleibol ya finalizó. Esta lista muestra solo Microfútbol mixto. El historial de voleibol sigue en Finanzas.
+      </p>
       {/* Progreso de cupos */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {(['Voleibol', 'Microfútbol'] as Disciplina[]).map((d) => {
-          const lista = porDisciplina[d];
-          const count = lista.length;
-          const min = MINIMOS[d];
-          const pct = Math.min((count / min) * 100, 100);
-          const complete = count >= min;
-          const masc = lista.filter((p) => p.genero === 'Masculino').length;
-          const fem = lista.filter((p) => p.genero === 'Femenino').length;
-          return (
-            <div
-              key={d}
-              className={`bg-white rounded-xl border p-5 ${
-                complete ? 'border-emerald-300 shadow-emerald-100 shadow-md' : 'border-gray-100 shadow-sm'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <p className="font-bold text-gray-900">{d === 'Voleibol' ? '🏐' : '⚽'} {d}</p>
-                  <p className="text-xs text-gray-500">
-                    {d === 'Voleibol' ? 'Mixto · Sáb. 22 Ago' : 'Masculino · Dom. 23 Ago'}
-                  </p>
-                </div>
-                <span className={`text-2xl font-extrabold ${complete ? 'text-emerald-600' : 'text-gray-900'}`}>
-                  {count}<span className="text-sm font-normal text-gray-400">/{min}</span>
-                </span>
-              </div>
-              <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all duration-500 ${
-                    complete ? 'bg-emerald-500' : pct >= 60 ? 'bg-amber-400' : 'bg-purple-400'
-                  }`}
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-              {count > 0 && (
-                <div className="flex gap-2 mt-2">
-                  <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">♂ {masc}</span>
-                  <span className="text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full">♀ {fem}</span>
-                </div>
-              )}
-              {complete ? (
-                <p className="mt-2 text-xs font-semibold text-emerald-700 flex items-center gap-1">
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                  </svg>
-                  ¡Cupo completo! Contáctalos para confirmar participación.
-                </p>
-              ) : (
-                <p className="mt-2 text-xs text-gray-400">
-                  Faltan <strong>{min - count}</strong> personas para completar el cupo mínimo.
-                </p>
-              )}
+      <div className="grid grid-cols-1 gap-4">
+        <div
+          className={`bg-white rounded-xl border p-5 ${
+            complete ? 'border-emerald-300 shadow-emerald-100 shadow-md' : 'border-gray-100 shadow-sm'
+          }`}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="font-bold text-gray-900">⚽ Microfútbol</p>
+              <p className="text-xs text-gray-500">Mixto</p>
             </div>
-          );
-        })}
+            <span className={`text-2xl font-extrabold ${complete ? 'text-emerald-600' : 'text-gray-900'}`}>
+              {count}<span className="text-sm font-normal text-gray-400">/{min}</span>
+            </span>
+          </div>
+          <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${
+                complete ? 'bg-emerald-500' : pct >= 60 ? 'bg-amber-400' : 'bg-purple-400'
+              }`}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          {count > 0 && (
+            <div className="flex gap-2 mt-2">
+              <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">♂ {masc}</span>
+              <span className="text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full">♀ {fem}</span>
+            </div>
+          )}
+          {complete ? (
+            <p className="mt-2 text-xs font-semibold text-emerald-700 flex items-center gap-1">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              </svg>
+              ¡Cupo completo! Contáctalos para confirmar participación.
+            </p>
+          ) : (
+            <p className="mt-2 text-xs text-gray-400">
+              Faltan <strong>{min - count}</strong> personas para completar el cupo mínimo.
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Tabla de individuales */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
           <p className="font-semibold text-gray-700 text-sm">
-            {individuales.length} persona{individuales.length !== 1 ? 's' : ''} en lista de espera
+            {lista.length} persona{lista.length !== 1 ? 's' : ''} en lista de espera
           </p>
           <button
             onClick={onRefresh}
@@ -1149,10 +1144,10 @@ function IndividualesPanel({ individuales, onRefresh, onRequestDelete }: Individ
             Actualizar
           </button>
         </div>
-        {individuales.length === 0 ? (
+        {lista.length === 0 ? (
           <div className="text-center py-14 text-gray-400">
             <p className="text-4xl mb-3">👤</p>
-            <p className="font-medium">Aún no hay inscripciones individuales</p>
+            <p className="font-medium">Aún no hay inscripciones individuales de microfútbol</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -1170,7 +1165,7 @@ function IndividualesPanel({ individuales, onRefresh, onRequestDelete }: Individ
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {individuales.map((ind, i) => (
+                {lista.map((ind, i) => (
                   <tr key={ind.id} className="hover:bg-gray-50 transition">
                     <td className="px-4 py-3 text-gray-400 font-mono">{i + 1}</td>
                     <td className="px-4 py-3 font-semibold text-gray-900">{ind.nombre}</td>
@@ -1331,13 +1326,21 @@ function FinanzasPanel({
                   <p className={`text-xs mt-0.5 ${torneo.muted}`}>
                     {torneo.data.equipos} equipo{torneo.data.equipos !== 1 ? 's' : ''} · {torneo.data.jugadores} jugador
                     {torneo.data.jugadores !== 1 ? 'es' : ''}
+                    {torneo.key === 'microfutbol' ? ' · Mixto' : ''}
                   </p>
                 </div>
-                {torneo.data.pendientesPago > 0 && (
-                  <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-100 text-amber-800">
-                    {torneo.data.pendientesPago} por revisar
-                  </span>
-                )}
+                <div className="flex flex-col items-end gap-1">
+                  {torneo.key === 'voleibol' && (
+                    <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-gray-200 text-gray-600">
+                      Finalizado
+                    </span>
+                  )}
+                  {torneo.data.pendientesPago > 0 && (
+                    <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-100 text-amber-800">
+                      {torneo.data.pendientesPago} por revisar
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>
@@ -1369,7 +1372,6 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState('');
   const [search, setSearch] = useState('');
-  const [filterDisciplina, setFilterDisciplina] = useState<Disciplina | 'Todas'>('Todas');
   const [selected, setSelected] = useState<Inscripcion | null>(null);
   const [editRosterOnOpen, setEditRosterOnOpen] = useState(false);
   const [paymentEdit, setPaymentEdit] = useState<Inscripcion | null>(null);
@@ -1491,19 +1493,26 @@ export default function AdminDashboard() {
     setPaymentEdit((prev) => (prev?.id === id ? { ...prev, comprobantes } : prev));
   };
 
+  const equiposActivos = useMemo(
+    () => inscripciones.filter((ins) => ins.disciplina === 'Microfútbol'),
+    [inscripciones]
+  );
+  const individualesActivos = useMemo(
+    () => individuales.filter((ind) => ind.disciplina === 'Microfútbol'),
+    [individuales]
+  );
+
   const filtered = useMemo(
     () =>
-      inscripciones.filter((ins) => {
+      equiposActivos.filter((ins) => {
         const term = search.toLowerCase();
-        const matchSearch =
+        return (
           !term ||
           ins.equipoNombre.toLowerCase().includes(term) ||
-          ins.capitan.nombre.toLowerCase().includes(term);
-        const matchDisciplina =
-          filterDisciplina === 'Todas' || ins.disciplina === filterDisciplina;
-        return matchSearch && matchDisciplina;
+          ins.capitan.nombre.toLowerCase().includes(term)
+        );
       }),
-    [inscripciones, search, filterDisciplina]
+    [equiposActivos, search]
   );
 
   const stats = useMemo(() => {
@@ -1588,8 +1597,8 @@ service cloud.firestore {
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="flex">
           {([
-            { id: 'equipos', label: 'Equipos', count: inscripciones.length, icon: '🏆' },
-            { id: 'individuales', label: 'Lista Individual', count: individuales.length, icon: '👤' },
+            { id: 'equipos', label: 'Equipos', count: equiposActivos.length, icon: '🏆' },
+            { id: 'individuales', label: 'Lista Individual', count: individualesActivos.length, icon: '👤' },
             { id: 'finanzas', label: 'Finanzas', count: null, icon: '💰' },
           ] as const).map((tab) => (
             <button
@@ -1610,13 +1619,9 @@ service cloud.firestore {
                 {tab.count}
               </span>
               )}
-              {tab.id === 'individuales' && individuales.length > 0 && (() => {
-                const vComplete = individuales.filter(i => i.disciplina === 'Voleibol').length >= MINIMOS.Voleibol;
-                const mComplete = individuales.filter(i => i.disciplina === 'Microfútbol').length >= MINIMOS['Microfútbol'];
-                return (vComplete || mComplete) ? (
+              {tab.id === 'individuales' && individualesActivos.length > 0 && individualesActivos.length >= MINIMOS['Microfútbol'] && (
                   <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" title="¡Cupo completo!" />
-                ) : null;
-              })()}
+              )}
             </button>
           ))}
         </div>
@@ -1643,6 +1648,9 @@ service cloud.firestore {
         />
       ) : (
       <>
+      <p className="text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 mb-4">
+        El voleibol ya finalizó. Aquí solo aparecen equipos de Microfútbol mixto. El recaudo de voleibol se mantiene en Finanzas.
+      </p>
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1 relative">
@@ -1661,21 +1669,6 @@ service cloud.firestore {
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none transition"
             />
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            {(['Todas', 'Voleibol', 'Microfútbol'] as const).map((d) => (
-              <button
-                key={d}
-                onClick={() => setFilterDisciplina(d)}
-                className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition ${
-                  filterDisciplina === d
-                    ? 'bg-emerald-600 text-white shadow-sm'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                {d}
-              </button>
-            ))}
           </div>
           <button
             onClick={() => exportToCSV(filtered)}
@@ -1698,9 +1691,9 @@ service cloud.firestore {
             Actualizar
           </button>
         </div>
-        {filtered.length !== inscripciones.length && (
+        {filtered.length !== equiposActivos.length && (
           <p className="text-xs text-gray-400 mt-2">
-            Mostrando {filtered.length} de {inscripciones.length} inscripciones
+            Mostrando {filtered.length} de {equiposActivos.length} equipos de microfútbol
           </p>
         )}
       </div>
@@ -1711,8 +1704,8 @@ service cloud.firestore {
           <div className="text-center py-16 text-gray-400">
             <p className="text-5xl mb-3">📋</p>
             <p className="font-medium">
-              {inscripciones.length === 0
-                ? 'No hay inscripciones aún'
+              {equiposActivos.length === 0
+                ? 'No hay equipos de microfútbol inscritos aún'
                 : 'Sin resultados para esta búsqueda'}
             </p>
           </div>
