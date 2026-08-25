@@ -5,22 +5,16 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Disciplina, Genero, FormValues } from '@/lib/types';
+import { PRECIO_POR_JUGADOR_COP, CAMBIOS_POR_EQUIPO, formatCOP } from '@/lib/constants';
 import { uploadComprobante as uploadComprobanteFile } from '@/lib/uploadComprobante';
 
-const PRECIO_POR_JUGADOR = 10_000;
 const MINIMOS: Record<Disciplina, number> = { Voleibol: 6, 'Microfútbol': 5 };
 const FECHAS: Record<Disciplina, string> = {
   Voleibol: '2026-08-22',
   'Microfútbol': '2026-08-23',
 };
 
-function formatCOP(amount: number): string {
-  return new Intl.NumberFormat('es-CO', {
-    style: 'currency',
-    currency: 'COP',
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
+const PAGO_RESERVA = PRECIO_POR_JUGADOR_COP;
 
 function generateId(): string {
   return Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
@@ -61,8 +55,6 @@ interface SubmittedData {
   totalJugadores: number;
   totalPagarCOP: number;
 }
-
-const PAGO_RESERVA = PRECIO_POR_JUGADOR;
 
 export default function TournamentForm() {
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -187,7 +179,7 @@ export default function TournamentForm() {
             </div>
           </div>
           <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-4">
-            Los $10.000 no se devuelven: con ese pago separamos el espacio de tu equipo. Puedes completar el resto de jugadores más adelante con los coordinadores.
+            Los {formatCOP(PRECIO_POR_JUGADOR_COP)} no se devuelven: con ese pago separamos el espacio de tu equipo. Puedes completar el resto de jugadores más adelante con los coordinadores.
           </p>
           <p className="text-xs text-gray-400 mb-6">
             Nos pondremos en contacto con el capitán para confirmar los detalles del torneo de microfútbol mixto.
@@ -208,14 +200,16 @@ export default function TournamentForm() {
       <form onSubmit={handleSubmit(onSubmit)} className="max-w-2xl mx-auto px-4 py-8 space-y-5">
 
         <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5">
-          <h3 className="font-bold text-emerald-900 mb-2 text-base">💡 Reserva tu cupo con $10.000</h3>
+          <h3 className="font-bold text-emerald-900 mb-2 text-base">💡 Reserva tu cupo con {formatCOP(PRECIO_POR_JUGADOR_COP)}</h3>
           <ul className="text-sm text-emerald-800 space-y-1.5 leading-relaxed">
             <li>
-              <strong>No necesitas reunir a todo el equipo ni pagar por todos ahora.</strong> Con la inscripción
-              del capitán y el comprobante de $10.000 reservas el espacio.
+              <strong>Costo del torneo: {formatCOP(PRECIO_POR_JUGADOR_COP)} por persona.</strong> No necesitas reunir a todo el equipo ni pagar por todos ahora: con la inscripción del capitán y el comprobante reservas el espacio.
             </li>
             <li>
               Ese dinero <strong>no se devuelve</strong>: con él separamos el cupo y organizamos el torneo.
+            </li>
+            <li>
+              Cada equipo puede hacer <strong>{CAMBIOS_POR_EQUIPO} cambio</strong> de jugador durante el torneo (validado por los coordinadores).
             </li>
             <li>
               Puedes agregar más jugadores ahora o más adelante. El día del partido se recomienda al menos{' '}
@@ -297,7 +291,7 @@ export default function TournamentForm() {
         <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <h2 className="text-lg font-bold text-gray-900 mb-1">3. Datos del Capitán</h2>
           <p className="text-sm text-gray-500 mb-4">
-            Con tus datos y $10.000 reservas el cupo del equipo. Este pago no es reembolsable.
+            Con tus datos y {formatCOP(PRECIO_POR_JUGADOR_COP)} reservas el cupo del equipo. Este pago no es reembolsable.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -473,13 +467,23 @@ export default function TournamentForm() {
             );
           })()}
 
-          <div className="mt-3 p-4 bg-emerald-50 rounded-xl border border-emerald-100">
+          <div className="mt-3 p-4 bg-emerald-50 rounded-xl border border-emerald-100 space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-700">Costo por jugador</span>
+              <span className="text-sm font-bold text-gray-800">{formatCOP(PRECIO_POR_JUGADOR_COP)}</span>
+            </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-700">Reserva de cupo (capitán)</span>
               <span className="text-base font-extrabold text-emerald-700">{formatCOP(totalPagar)}</span>
             </div>
-            <p className="text-xs text-emerald-700 mt-1.5">
-              No pagas por cada jugador ahora. Los $10.000 separan el espacio del equipo y no son reembolsables.
+            {totalJugadores > 1 && (
+              <div className="flex justify-between items-center text-xs text-gray-500 pt-1 border-t border-emerald-100">
+                <span>Total estimado del equipo ({totalJugadores} jug.)</span>
+                <span>{formatCOP(PRECIO_POR_JUGADOR_COP * totalJugadores)}</span>
+              </div>
+            )}
+            <p className="text-xs text-emerald-700">
+              No pagas por cada jugador ahora. {formatCOP(PRECIO_POR_JUGADOR_COP)} del capitán separan el espacio del equipo y no son reembolsables. Cada equipo puede hacer {CAMBIOS_POR_EQUIPO} cambio de jugador.
             </p>
           </div>
         </section>
@@ -488,7 +492,7 @@ export default function TournamentForm() {
         <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <h2 className="text-lg font-bold text-gray-900 mb-1">5. Comprobante de Pago</h2>
           <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 space-y-2">
-            <p className="font-semibold">💳 Paga $10.000 COP para reservar el cupo</p>
+            <p className="font-semibold">💳 Paga {formatCOP(PRECIO_POR_JUGADOR_COP)} para reservar el cupo</p>
             <p>
               Transfiere el valor de <strong>una persona</strong> (el capitán) al medio indicado por los coordinadores
               (Nequi / Daviplata / cuenta bancaria) y adjunta el screenshot o foto del comprobante.
@@ -549,12 +553,12 @@ export default function TournamentForm() {
             <input
               type="checkbox"
               {...register('reservaNoReembolsableAceptada', {
-                required: 'Debes aceptar que la reserva de $10.000 no es reembolsable',
+                required: `Debes aceptar que la reserva de ${formatCOP(PRECIO_POR_JUGADOR_COP)} no es reembolsable`,
               })}
               className="mt-0.5 w-5 h-5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 flex-shrink-0"
             />
             <span className="text-sm text-gray-700">
-              Entiendo que los $10.000 del capitán reservan el cupo del equipo y <strong>no son reembolsables</strong>.
+              Entiendo que los {formatCOP(PRECIO_POR_JUGADOR_COP)} del capitán reservan el cupo del equipo y <strong>no son reembolsables</strong>.
             </span>
           </label>
           {errors.reservaNoReembolsableAceptada && (
@@ -577,6 +581,9 @@ export default function TournamentForm() {
                 integración y sana convivencia. Incumplir esta regla puede resultar en la exclusión del equipo.
               </p>
             </div>
+            <p className="pt-1 border-t border-gray-200">
+              🔄 <strong>Cambios:</strong> Cada equipo puede hacer {CAMBIOS_POR_EQUIPO} cambio de jugador durante el torneo, sujeto a validación de los coordinadores.
+            </p>
             {disciplina === 'Microfútbol' && (
               <p className="pt-1 border-t border-gray-200">
                 👫 <strong>Microfútbol Mixto:</strong> En cancha siempre debe haber mínimo 1 jugador/a del sexo opuesto a la mayoría. Incumplir esta regla puede resultar en descalificación del punto o del partido.

@@ -1,3 +1,5 @@
+import { PRECIO_POR_JUGADOR_COP, CAMBIOS_POR_EQUIPO, formatCOP } from '@/lib/constants';
+
 export default function HeroBanner() {
   return (
     <div className="bg-gradient-to-br from-emerald-700 via-emerald-800 to-emerald-900 text-white py-10 px-4">
@@ -20,7 +22,7 @@ export default function HeroBanner() {
           Coordinadores: Nicolás Mantilla, Jeronimo Roa y Lina Umaña
         </p>
         <p className="mt-3 mx-auto max-w-md text-emerald-100/90 text-xs leading-relaxed">
-          Reserva el cupo de tu equipo de microfútbol con $10.000 del capitán. No necesitas reunir ni pagar a todo el equipo ahora. El pago no es reembolsable.
+          {formatCOP(PRECIO_POR_JUGADOR_COP)} por persona. Reserva el cupo de tu equipo con el pago del capitán — no necesitas reunir ni pagar a todo el equipo ahora. El pago no es reembolsable. Cada equipo puede hacer {CAMBIOS_POR_EQUIPO} cambio de jugador.
         </p>
         <p className="mt-2 mx-auto max-w-md text-emerald-200/80 text-xs leading-relaxed">
           Este torneo es un espacio de integración y sana convivencia. No se admiten jugadores piratas ni semiprofesionales.

@@ -5,6 +5,7 @@ import { collection, deleteDoc, doc, getDocs, query, orderBy, updateDoc } from '
 import { db } from '@/lib/firebase';
 import { Inscripcion, Individual, Disciplina, Genero, Jugador, Capitan, ComprobantePago } from '@/lib/types';
 import { uploadComprobante } from '@/lib/uploadComprobante';
+import { PRECIO_POR_JUGADOR_COP } from '@/lib/constants';
 
 const MINIMOS: Record<Disciplina, number> = { Voleibol: 6, 'Microfútbol': 5 };
 
@@ -932,7 +933,7 @@ function PaymentReviewModal({
             />
           </div>
           <p className="text-xs text-gray-500 mb-3">
-            Suma lo que ves en las imágenes. Ejemplo: 10000 del capitán + 30000 de otros = 40000.
+            Suma lo que ves en las imágenes. Ejemplo: {PRECIO_POR_JUGADOR_COP} del capitán + {PRECIO_POR_JUGADOR_COP * 3} de otros = {PRECIO_POR_JUGADOR_COP * 4}.
           </p>
 
           {error && (

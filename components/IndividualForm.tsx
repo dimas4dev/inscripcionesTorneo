@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Disciplina, Genero } from '@/lib/types';
+import { PRECIO_POR_JUGADOR_COP, CAMBIOS_POR_EQUIPO, formatCOP } from '@/lib/constants';
 
 const MINIMOS: Record<Disciplina, number> = { Voleibol: 6, 'Microfútbol': 5 };
 
@@ -84,7 +85,7 @@ export default function IndividualForm() {
             <p>
               Los coordinadores están reuniendo participantes individuales. Si se completa el cupo mínimo de{' '}
               <strong>{MINIMOS[submittedDisciplina]} personas</strong> para {submittedDisciplina}, te contactarán
-              por WhatsApp para confirmar tu participación y coordinar el pago de $10.000 COP.
+              por WhatsApp para confirmar tu participación y coordinar el pago de {formatCOP(PRECIO_POR_JUGADOR_COP)}.
             </p>
             <p className="text-amber-700">
               ⚠️ Si el cupo no se completa, no hay costo alguno.
@@ -110,14 +111,14 @@ export default function IndividualForm() {
         </h3>
         <ul className="text-sm text-amber-800 space-y-1.5 leading-relaxed list-none">
           <li>
-            <strong>1.</strong> Te anotas en la lista de tu disciplina preferida.
+            <strong>1.</strong> Te anotas en la lista de Microfútbol mixto ({formatCOP(PRECIO_POR_JUGADOR_COP)} por persona).
           </li>
           <li>
             <strong>2.</strong> Los coordinadores reúnen a los individuales y forman equipos cuando hay cupo
             suficiente ({MINIMOS['Microfútbol']} para Microfútbol mixto).
           </li>
           <li>
-            <strong>3.</strong> Si el cupo se completa, te contactan por WhatsApp para confirmar y pagar ($10.000 COP).
+            <strong>3.</strong> Si el cupo se completa, te contactan por WhatsApp para confirmar y pagar ({formatCOP(PRECIO_POR_JUGADOR_COP)}).
           </li>
           <li>
             <strong>4.</strong> Si no se completa el cupo, no hay ningún costo — simplemente no participas.
@@ -253,6 +254,7 @@ export default function IndividualForm() {
                 integración y sana convivencia. Incumplir esta regla puede resultar en la exclusión.
               </p>
             </div>
+            <p>🔄 Los equipos formados pueden hacer {CAMBIOS_POR_EQUIPO} cambio de jugador durante el torneo.</p>
           </div>
           <label className="flex items-start gap-3 cursor-pointer">
             <input

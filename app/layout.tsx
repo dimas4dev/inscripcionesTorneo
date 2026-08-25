@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
+import { PRECIO_POR_JUGADOR_COP, formatCOP } from "@/lib/constants";
 import "./globals.css";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
@@ -17,7 +18,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "⚡ Torneo Ágape 2026 — ¡Inscribe tu equipo!",
     description:
-      "⚽ Microfútbol mixto · El Ministerio Ordóñez · $10.000 COP reserva el cupo de tu equipo",
+      `${formatCOP(PRECIO_POR_JUGADOR_COP)} por persona · reserva el cupo de tu equipo`,
     url: BASE_URL,
     siteName: "Torneo Ágape 2026",
     images: [
