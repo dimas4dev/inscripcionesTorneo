@@ -31,8 +31,7 @@ function formatDate(timestamp: Inscripcion['createdAt']): string {
 function isLikelyImage(url: string): boolean {
   if (!url) return false;
   if (/\.pdf(\?|#|$)/i.test(url)) return false;
-  if (/\.(jpe?g|png|gif|webp|avif|bmp)(\?|#|$)/i.test(url)) return true;
-  return url.includes('res.cloudinary.com');
+  return true;
 }
 
 function generateId(): string {
@@ -655,6 +654,10 @@ function PaymentReviewModal({
   const selectedReceipt = receipts[Math.min(selectedIndex, Math.max(receipts.length - 1, 0))];
   const showImage = selectedReceipt ? isLikelyImage(selectedReceipt.url) && !imageFailed : false;
 
+  useEffect(() => {
+    setImageFailed(false);
+  }, [selectedReceipt?.url]);
+
   const handleSave = async () => {
     if (!inscripcion.id) return;
     const parsed = Number(String(amountInput).replace(/[^\d]/g, ''));
@@ -754,8 +757,43 @@ function PaymentReviewModal({
             Sube los comprobantes de quienes paguen después del capitán y ajusta el total abonado según todas las imágenes.
           </p>
 
-          {receipts.length > 1 && (
-            <div className="flex gap-2 overflow-x-auto pb-3 mb-3">
+          {receipts.length > 0 && (
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-semibold text-gray-800">
+                {receipts.length} comprobante{receipts.length !== 1 ? 's' : ''}
+              </p>
+              {receipts.length > 1 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedIndex((i) => (i === 0 ? receipts.length - 1 : i - 1));
+                      setImageFailed(false);
+                    }}
+                    className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  >
+                    Anterior
+                  </button>
+                  <span className="text-xs text-gray-500">
+                    {Math.min(selectedIndex, receipts.length - 1) + 1} / {receipts.length}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedIndex((i) => (i + 1) % receipts.length);
+                      setImageFailed(false);
+                    }}
+                    className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  >
+                    Siguiente
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {receipts.length > 0 && (
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-3">
               {receipts.map((receipt, index) => (
                 <button
                   key={receipt.id}
@@ -764,19 +802,22 @@ function PaymentReviewModal({
                     setSelectedIndex(index);
                     setImageFailed(false);
                   }}
-                  className={`flex-shrink-0 w-20 h-16 rounded-lg overflow-hidden border-2 ${
-                    selectedIndex === index ? 'border-emerald-500' : 'border-gray-200'
+                  className={`rounded-lg overflow-hidden border-2 text-left ${
+                    selectedIndex === index ? 'border-emerald-500 ring-2 ring-emerald-100' : 'border-gray-200'
                   }`}
                   title={receipt.nota || `Comprobante ${index + 1}`}
                 >
                   {isLikelyImage(receipt.url) ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={receipt.url} alt="" className="w-full h-full object-cover bg-gray-100" />
+                    <img src={receipt.url} alt="" className="w-full h-16 object-cover bg-gray-100" />
                   ) : (
-                    <span className="w-full h-full flex items-center justify-center text-[10px] font-semibold text-gray-500 bg-gray-50">
-                      PDF
+                    <span className="w-full h-16 flex items-center justify-center text-[10px] font-semibold text-gray-500 bg-gray-50">
+                      Archivo
                     </span>
                   )}
+                  <span className="block px-1.5 py-1 text-[10px] font-medium text-gray-600 truncate bg-white">
+                    {receipt.nota || (index === 0 ? 'Capitán' : `#${index + 1}`)}
+                  </span>
                 </button>
               ))}
             </div>
@@ -1789,18 +1830,22 @@ service cloud.firestore {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                           </svg>
                         </button>
-                        <a
-                          href={ins.comprobanteUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="w-8 h-8 flex items-center justify-center rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition"
-                          title="Revisar comprobantes"
+                        <button
+                          type="button"
+                          onClick={() => setPaymentEdit(ins)}
+                          className="w-8 h-8 flex items-center justify-center rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition relative"
+                          title="Ver todos los comprobantes"
                         >
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                           </svg>
-                        </a>
+                          {listComprobantes(ins).length > 1 && (
+                            <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-blue-600 text-white text-[9px] font-bold flex items-center justify-center">
+                              {listComprobantes(ins).length}
+                            </span>
+                          )}
+                        </button>
                         <button
                           type="button"
                           onClick={() => setPaymentEdit(ins)}
