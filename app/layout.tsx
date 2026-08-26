@@ -10,7 +10,7 @@ const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "https://inscripcionestorne
 export const metadata: Metadata = {
   title: "Torneo Ágape 2026 — Inscripciones",
   description:
-    "Reserva el cupo de tu equipo en el Torneo Ágape 2026. ⚽ Fútbol 5 · masculino o mixto. El Ministerio Ordóñez.",
+    "Inscribe tu equipo en el Torneo Ágape 2026. ⚽ Fútbol 5 · masculino o mixto. El Ministerio Ordóñez.",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
