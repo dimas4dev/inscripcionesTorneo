@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
-import { PRECIO_POR_JUGADOR_COP, formatCOP } from "@/lib/constants";
+import { PRECIO_POR_JUGADOR_COP, INSCRIPCION_TORNEO_COP, formatCOP } from "@/lib/constants";
 import "./globals.css";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "⚡ Torneo Ágape 2026 — ¡Inscribe tu equipo!",
     description:
-      `${formatCOP(PRECIO_POR_JUGADOR_COP)} por persona · reserva el cupo de tu equipo`,
+      `${formatCOP(INSCRIPCION_TORNEO_COP)} inscripción por equipo · ${formatCOP(PRECIO_POR_JUGADOR_COP)} por persona`,
     url: BASE_URL,
     siteName: "Torneo Ágape 2026",
     images: [

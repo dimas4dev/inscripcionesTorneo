@@ -5,7 +5,7 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Disciplina, Genero, FormValues, DISCIPLINA_FUTBOL_5, Modalidad } from '@/lib/types';
-import { PRECIO_POR_JUGADOR_COP, CAMBIOS_POR_EQUIPO, formatCOP, MINIMOS, calcularPagoInscripcion, calificaPagoMitad, getMaximoJugadores, getUmbralPagoMitad } from '@/lib/constants';
+import { PRECIO_POR_JUGADOR_COP, INSCRIPCION_TORNEO_COP, PAGO_INSCRIPCION_MITAD_COP, CAMBIOS_POR_EQUIPO, formatCOP, MINIMOS, calcularPagoInscripcion, calificaPagoMitad, getMaximoJugadores, getUmbralPagoMitad } from '@/lib/constants';
 import { uploadComprobante as uploadComprobanteFile } from '@/lib/uploadComprobante';
 
 const FECHAS: Record<Disciplina, string> = {
@@ -104,7 +104,7 @@ export default function TournamentForm() {
   const umbralPagoMitad = getUmbralPagoMitad(disciplina);
   const pagoMitad = calificaPagoMitad(totalJugadores, disciplina);
   const totalPagar = calcularPagoInscripcion(totalJugadores, disciplina);
-  const valorTotalEquipo = PRECIO_POR_JUGADOR_COP * Math.max(totalJugadores, 1);
+  const saldoInscripcion = INSCRIPCION_TORNEO_COP - PAGO_INSCRIPCION_MITAD_COP;
   const soloMasculino = modalidad === 'Masculino';
 
   const handleModalidadChange = (next: Modalidad) => {
@@ -230,14 +230,16 @@ export default function TournamentForm() {
           <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-4">
             {submittedData.pagoMitad ? (
               <>
-                Pagaste la mitad del valor total del equipo ({formatCOP(submittedData.totalPagarCOP * 2)}). El saldo se
-                coordina con los organizadores. Este pago no se devuelve.
+                Abonaste el 50% de la inscripción del torneo ({formatCOP(INSCRIPCION_TORNEO_COP)}):{' '}
+                {formatCOP(submittedData.totalPagarCOP)}. El saldo ({formatCOP(saldoInscripcion)}) se coordina con los
+                organizadores. Este pago no se devuelve.
               </>
             ) : (
               <>
                 Los {formatCOP(submittedData.totalPagarCOP)} no se devuelven: con ese pago separamos el espacio de tu
                 equipo. Si registras <strong>{getUmbralPagoMitad(submittedData.disciplina)} o más jugadores</strong>{' '}
-                (más de la mitad de la plantilla), pagas la mitad del valor total del equipo.
+                (más de la mitad de la plantilla), abonas el 50% de la inscripción ({formatCOP(PAGO_INSCRIPCION_MITAD_COP)} de{' '}
+                {formatCOP(INSCRIPCION_TORNEO_COP)}).
               </>
             )}
           </p>
@@ -261,26 +263,27 @@ export default function TournamentForm() {
 
         <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5">
           <h3 className="font-bold text-emerald-900 mb-2 text-base">
-            💡 {pagoMitad ? 'Más de la mitad de la plantilla — pagas el 50%' : `Reserva tu cupo con ${formatCOP(PRECIO_POR_JUGADOR_COP)}`}
+            💡 {pagoMitad ? 'Más de la mitad de la plantilla — abonas el 50%' : `Reserva tu cupo con ${formatCOP(PRECIO_POR_JUGADOR_COP)}`}
           </h3>
           <ul className="text-sm text-emerald-800 space-y-1.5 leading-relaxed">
             <li>
-              <strong>Costo del torneo: {formatCOP(PRECIO_POR_JUGADOR_COP)} por persona.</strong>{' '}
+              <strong>Inscripción del torneo: {formatCOP(INSCRIPCION_TORNEO_COP)} por equipo</strong> ({formatCOP(PRECIO_POR_JUGADOR_COP)} por persona).{' '}
               {pagoMitad ? (
                 <>
-                  Con <strong>{umbralPagoMitad} o más jugadores</strong> (más de la mitad de los {maxJugadores}) pagas{' '}
-                  <strong>la mitad del valor total</strong> ({formatCOP(totalPagar)} de {formatCOP(valorTotalEquipo)}).
+                  Con <strong>{umbralPagoMitad} o más jugadores</strong> (más de la mitad de los {maxJugadores}) abonas el{' '}
+                  <strong>50% de la inscripción</strong> ({formatCOP(PAGO_INSCRIPCION_MITAD_COP)}).
                 </>
               ) : (
                 <>
                   Con menos de {umbralPagoMitad} jugadores, el capitán paga {formatCOP(PRECIO_POR_JUGADOR_COP)} para
-                  reservar el espacio. A partir de {umbralPagoMitad} jugadores pagas solo la mitad del total.
+                  reservar el espacio. A partir de {umbralPagoMitad} jugadores abonas el 50% ({formatCOP(PAGO_INSCRIPCION_MITAD_COP)}).
                 </>
               )}
             </li>
             <li>
-              <strong>Regla de pago:</strong> plantilla máxima {maxJugadores} jugadores — si inscribes{' '}
-              <strong>{umbralPagoMitad} o más</strong> (más de la mitad), pagas el 50% del valor de quienes registres.
+              <strong>Regla de inscripción:</strong> plantilla máxima {maxJugadores} jugadores — con{' '}
+              <strong>{umbralPagoMitad} o más</strong> (más de la mitad) debes abonar el 50% de los{' '}
+              {formatCOP(INSCRIPCION_TORNEO_COP)} del torneo ({formatCOP(PAGO_INSCRIPCION_MITAD_COP)}).
             </li>
             <li>
               Ese dinero <strong>no se devuelve</strong>: con él separamos el cupo y organizamos el torneo.
@@ -409,14 +412,14 @@ export default function TournamentForm() {
           <p className="text-sm text-gray-500 mb-4">
             {pagoMitad ? (
               <>
-                Con <strong>{totalJugadores} jugadores</strong> (más de la mitad de la plantilla) pagas{' '}
-                <strong>{formatCOP(totalPagar)}</strong> — el 50% del valor total del equipo. No es reembolsable.
+                Con <strong>{totalJugadores} jugadores</strong> (más de la mitad de la plantilla) abonas{' '}
+                <strong>{formatCOP(totalPagar)}</strong> — el 50% de la inscripción del torneo ({formatCOP(INSCRIPCION_TORNEO_COP)}). No es reembolsable.
               </>
             ) : (
               <>
                 Con tus datos y <strong>{formatCOP(PRECIO_POR_JUGADOR_COP)}</strong> reservas el cupo. Si registras{' '}
-                <strong>{umbralPagoMitad} o más jugadores</strong> (más de la mitad de {maxJugadores}), pagas la mitad
-                del valor total. No es reembolsable.
+                <strong>{umbralPagoMitad} o más jugadores</strong> (más de la mitad de {maxJugadores}), abonas el 50% de
+                la inscripción ({formatCOP(PAGO_INSCRIPCION_MITAD_COP)}). No es reembolsable.
               </>
             )}
           </p>
@@ -492,14 +495,15 @@ export default function TournamentForm() {
             Opcional. Puedes reservar el cupo solo con el capitán y agregar al resto después (máximo{' '}
             <strong>{maxJugadores}</strong> en plantilla: {MINIMOS[disciplina]} en cancha + {CAMBIOS_POR_EQUIPO} cambio).
             Si registras <strong>{umbralPagoMitad} o más jugadores</strong> con nombre y documento (más de la mitad de{' '}
-            {maxJugadores}), pagas la mitad del valor total del equipo al inscribirte.
+            {maxJugadores}), debes abonar el 50% de la inscripción del torneo ({formatCOP(PAGO_INSCRIPCION_MITAD_COP)} de{' '}
+            {formatCOP(INSCRIPCION_TORNEO_COP)}).
           </p>
           {pagoMitad && (
             <div className="mb-4 flex gap-2.5 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 leading-relaxed">
               <span className="flex-shrink-0">✅</span>
               <span>
-                <strong>Aplica 50%:</strong> con {totalJugadores} jugadores (≥ {umbralPagoMitad}) tu pago es{' '}
-                {formatCOP(totalPagar)} — mitad de {formatCOP(valorTotalEquipo)}.
+                <strong>Aplica 50%:</strong> con {totalJugadores} jugadores (≥ {umbralPagoMitad}) abonas{' '}
+                {formatCOP(totalPagar)} — mitad de la inscripción del torneo ({formatCOP(INSCRIPCION_TORNEO_COP)}).
               </span>
             </div>
           )}
@@ -508,7 +512,7 @@ export default function TournamentForm() {
               <span className="flex-shrink-0">💡</span>
               <span>
                 Faltan {umbralPagoMitad - totalJugadores} jugador{umbralPagoMitad - totalJugadores !== 1 ? 'es' : ''} para
-                pagar la mitad ({umbralPagoMitad}+ de {maxJugadores}).
+                abonar el 50% ({formatCOP(PAGO_INSCRIPCION_MITAD_COP)} de {formatCOP(INSCRIPCION_TORNEO_COP)}).
               </span>
             </div>
           )}
@@ -627,31 +631,31 @@ export default function TournamentForm() {
 
           <div className="mt-3 p-4 bg-emerald-50 rounded-xl border border-emerald-100 space-y-2">
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-700">Costo por jugador</span>
-              <span className="text-sm font-bold text-gray-800">{formatCOP(PRECIO_POR_JUGADOR_COP)}</span>
+              <span className="text-sm text-gray-700">Inscripción del torneo</span>
+              <span className="text-sm font-bold text-gray-800">{formatCOP(INSCRIPCION_TORNEO_COP)}</span>
             </div>
-            {totalJugadores > 0 && (
-              <div className="flex justify-between items-center text-xs text-gray-500">
-                <span>Valor total del equipo ({totalJugadores} jug.)</span>
-                <span>{formatCOP(valorTotalEquipo)}</span>
-              </div>
-            )}
+            <div className="flex justify-between items-center text-xs text-gray-500">
+              <span>Referencia por jugador</span>
+              <span>{formatCOP(PRECIO_POR_JUGADOR_COP)}</span>
+            </div>
             <div className="flex justify-between items-center pt-1 border-t border-emerald-100">
               <span className="text-sm text-gray-700">
-                {pagoMitad ? 'Pago ahora (50% del total)' : 'Reserva de cupo (capitán)'}
+                {pagoMitad ? 'Abono ahora (50% inscripción)' : 'Reserva de cupo (capitán)'}
               </span>
               <span className="text-base font-extrabold text-emerald-700">{formatCOP(totalPagar)}</span>
             </div>
             <p className="text-xs text-emerald-700">
               {pagoMitad ? (
                 <>
-                  Con {totalJugadores} jugadores (≥ {umbralPagoMitad}): pagas el 50% del valor total. El saldo restante (
-                  {formatCOP(valorTotalEquipo - totalPagar)}) se coordina con los organizadores.
+                  Con {totalJugadores} jugadores (≥ {umbralPagoMitad}): abonas el 50% de los{' '}
+                  {formatCOP(INSCRIPCION_TORNEO_COP)} del torneo. El saldo restante ({formatCOP(saldoInscripcion)}) se
+                  coordina con los organizadores.
                 </>
               ) : (
                 <>
                   Con menos de {umbralPagoMitad} jugadores, {formatCOP(PRECIO_POR_JUGADOR_COP)} del capitán reservan el
-                  cupo. A partir de {umbralPagoMitad} jugadores pagas solo la mitad del total. No es reembolsable.
+                  cupo. A partir de {umbralPagoMitad} jugadores abonas el 50% ({formatCOP(PAGO_INSCRIPCION_MITAD_COP)}). No
+                  es reembolsable.
                 </>
               )}
             </p>
@@ -664,7 +668,9 @@ export default function TournamentForm() {
           <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 space-y-2">
             <p className="font-semibold">
               💳 Paga {formatCOP(totalPagar)}
-              {pagoMitad ? ' (50% — más de la mitad de la plantilla)' : ' para reservar el cupo'}
+              {pagoMitad
+                ? ` (50% de la inscripción — ${formatCOP(PAGO_INSCRIPCION_MITAD_COP)} de ${formatCOP(INSCRIPCION_TORNEO_COP)})`
+                : ' para reservar el cupo'}
             </p>
             <p>
               Transfiere el monto indicado al medio señalado por los coordinadores (Nequi / Daviplata / cuenta bancaria)
@@ -673,7 +679,7 @@ export default function TournamentForm() {
             <p>
               <strong>Este dinero no se devuelve.</strong>
               {pagoMitad
-                ? ' El saldo restante se coordina con los organizadores.'
+                ? ` El saldo restante (${formatCOP(saldoInscripcion)}) se coordina con los organizadores.`
                 : ' Con ese pago separamos el espacio de tu equipo para organizar el torneo.'}
             </p>
           </div>
@@ -733,7 +739,7 @@ export default function TournamentForm() {
             />
             <span className="text-sm text-gray-700">
               Entiendo que los {formatCOP(totalPagar)} de esta inscripción{' '}
-              {pagoMitad ? 'corresponden al 50% del valor del equipo y ' : 'reservan el cupo del equipo y '}
+              {pagoMitad ? 'corresponden al 50% de la inscripción del torneo y ' : 'reservan el cupo del equipo y '}
               <strong>no son reembolsables</strong>.
             </span>
           </label>
