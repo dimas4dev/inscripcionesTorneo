@@ -4,17 +4,22 @@ import { useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Disciplina, Genero, FormValues } from '@/lib/types';
-import { PRECIO_POR_JUGADOR_COP, CAMBIOS_POR_EQUIPO, formatCOP } from '@/lib/constants';
+import { Disciplina, Genero, FormValues, DISCIPLINA_FUTBOL_5, Modalidad } from '@/lib/types';
+import { PRECIO_POR_JUGADOR_COP, CAMBIOS_POR_EQUIPO, formatCOP, MINIMOS, calcularPagoInscripcion, calificaPagoMitad, getMaximoJugadores, getUmbralPagoMitad } from '@/lib/constants';
 import { uploadComprobante as uploadComprobanteFile } from '@/lib/uploadComprobante';
 
-const MINIMOS: Record<Disciplina, number> = { Voleibol: 6, 'Microfútbol': 5 };
 const FECHAS: Record<Disciplina, string> = {
   Voleibol: '2026-08-22',
-  'Microfútbol': '2026-08-23',
+  'Fútbol 5': '2026-08-23',
 };
 
-const PAGO_RESERVA = PRECIO_POR_JUGADOR_COP;
+function contarJugadoresConDatos(
+  capitan: FormValues['capitan'],
+  jugadores: FormValues['jugadores']
+): number {
+  const adicionales = jugadores.filter((j) => j.nombre.trim() !== '' && j.documento.trim() !== '').length;
+  return capitan.nombre.trim() && capitan.documento.trim() ? 1 + adicionales : adicionales;
+}
 
 function generateId(): string {
   return Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
@@ -23,24 +28,26 @@ function generateId(): string {
 function GenderToggle({
   value,
   onChange,
+  soloMasculino = false,
 }: {
   value: Genero;
   onChange: (g: Genero) => void;
+  soloMasculino?: boolean;
 }) {
+  const options = soloMasculino ? (['Masculino'] as Genero[]) : (['Masculino', 'Femenino'] as Genero[]);
   return (
     <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-semibold">
-      {(['Masculino', 'Femenino'] as Genero[]).map((g) => (
+      {options.map((g) => (
         <button
           key={g}
           type="button"
           onClick={() => onChange(g)}
-          className={`flex-1 px-3 py-2 transition-colors ${
-            value === g
+          className={`flex-1 px-3 py-2 transition-colors ${value === g
               ? g === 'Masculino'
                 ? 'bg-blue-500 text-white'
                 : 'bg-rose-500 text-white'
               : 'bg-white text-gray-500 hover:bg-gray-50'
-          }`}
+            }`}
         >
           {g === 'Masculino' ? '♂ M' : '♀ F'}
         </button>
@@ -54,6 +61,7 @@ interface SubmittedData {
   disciplina: Disciplina;
   totalJugadores: number;
   totalPagarCOP: number;
+  pagoMitad: boolean;
 }
 
 export default function TournamentForm() {
@@ -73,7 +81,8 @@ export default function TournamentForm() {
     formState: { errors },
   } = useForm<FormValues>({
     defaultValues: {
-      disciplina: 'Microfútbol',
+      disciplina: DISCIPLINA_FUTBOL_5,
+      modalidad: 'Masculino' as Modalidad,
       capitan: { nombre: '', documento: '', telefono: '', email: '', genero: 'Masculino' },
       jugadores: [],
       reglamentoAceptado: false,
@@ -84,10 +93,27 @@ export default function TournamentForm() {
   const { fields, append, remove } = useFieldArray({ control, name: 'jugadores' });
 
   const disciplina = watch('disciplina');
+  const modalidad = watch('modalidad');
   const capitanNombre = watch('capitan.nombre');
+  const capitanWatch = watch('capitan');
+  const jugadoresWatch = watch('jugadores');
 
-  const totalJugadores = 1 + fields.length;
-  const totalPagar = PAGO_RESERVA;
+  const totalJugadores = contarJugadoresConDatos(capitanWatch, jugadoresWatch ?? []);
+  const maxJugadores = getMaximoJugadores(disciplina);
+  const plantillaLlena = 1 + fields.length >= maxJugadores;
+  const umbralPagoMitad = getUmbralPagoMitad(disciplina);
+  const pagoMitad = calificaPagoMitad(totalJugadores, disciplina);
+  const totalPagar = calcularPagoInscripcion(totalJugadores, disciplina);
+  const valorTotalEquipo = PRECIO_POR_JUGADOR_COP * Math.max(totalJugadores, 1);
+  const soloMasculino = modalidad === 'Masculino';
+
+  const handleModalidadChange = (next: Modalidad) => {
+    setValue('modalidad', next);
+    if (next === 'Masculino') {
+      setValue('capitan.genero', 'Masculino');
+      fields.forEach((_, index) => setValue(`jugadores.${index}.genero`, 'Masculino'));
+    }
+  };
 
   const uploadComprobante = (file: File): Promise<string> => {
     return uploadComprobanteFile(file, setUploadProgress);
@@ -97,6 +123,13 @@ export default function TournamentForm() {
     if (data.disciplina === 'Voleibol') {
       setSubmitError('Las inscripciones de Voleibol ya están cerradas. El torneo se celebró.');
       return;
+    }
+    if (data.modalidad === 'Masculino') {
+      const todosMasculinos = [data.capitan, ...data.jugadores].every((j) => j.genero === 'Masculino');
+      if (!todosMasculinos) {
+        setSubmitError('En modalidad masculina todos los jugadores deben ser hombres.');
+        return;
+      }
     }
     if (!comprobanteFile) {
       setSubmitError('Por favor adjunta el comprobante de pago.');
@@ -122,17 +155,30 @@ export default function TournamentForm() {
         ...jugadoresAdicionales.map((j) => ({ id: generateId(), nombre: j.nombre, documento: j.documento, esCapitan: false, genero: j.genero })),
       ];
 
+      const maxPlantilla = getMaximoJugadores(data.disciplina);
+      if (jugadores.length > maxPlantilla) {
+        setSubmitError(
+          `La plantilla no puede superar ${maxPlantilla} jugadores (${MINIMOS[data.disciplina]} en cancha + ${CAMBIOS_POR_EQUIPO} cambio).`
+        );
+        return;
+      }
+
+      const pagoInscripcion = calcularPagoInscripcion(jugadores.length, data.disciplina);
+      const aplicaPagoMitad = calificaPagoMitad(jugadores.length, data.disciplina);
+
       await addDoc(collection(db, 'inscripciones'), {
         equipoNombre: data.equipoNombre,
         disciplina: data.disciplina,
+        modalidad: data.modalidad,
         fechaTorneo: FECHAS[data.disciplina],
         capitan: data.capitan,
         jugadores,
         totalJugadores: jugadores.length,
-        totalPagarCOP: PAGO_RESERVA,
+        totalPagarCOP: pagoInscripcion,
         comprobanteUrl,
         reglamentoAceptado: data.reglamentoAceptado,
-        reservaCupo: true,
+        reservaCupo: !aplicaPagoMitad,
+        equipoCompletoAlInscribir: aplicaPagoMitad,
         reservaNoReembolsableAceptada: data.reservaNoReembolsableAceptada,
         createdAt: serverTimestamp(),
       });
@@ -141,7 +187,8 @@ export default function TournamentForm() {
         equipoNombre: data.equipoNombre,
         disciplina: data.disciplina,
         totalJugadores: jugadores.length,
-        totalPagarCOP: PAGO_RESERVA,
+        totalPagarCOP: pagoInscripcion,
+        pagoMitad: aplicaPagoMitad,
       });
       reset();
       setComprobanteFile(null);
@@ -163,7 +210,9 @@ export default function TournamentForm() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h2 className="text-2xl font-extrabold text-gray-900 mb-2">¡Cupo reservado!</h2>
+          <h2 className="text-2xl font-extrabold text-gray-900 mb-2">
+            {submittedData.pagoMitad ? '¡Inscripción con 50%!' : '¡Cupo reservado!'}
+          </h2>
           <p className="text-gray-500 mb-6">
             El equipo <strong className="text-gray-800">{submittedData.equipoNombre}</strong> ya tiene cupo en{' '}
             <strong className="text-emerald-700">{submittedData.disciplina}</strong>.
@@ -174,15 +223,26 @@ export default function TournamentForm() {
               <strong>{submittedData.totalJugadores}</strong>
             </div>
             <div className="flex justify-between">
-              <span>Reserva de cupo</span>
+              <span>{submittedData.pagoMitad ? 'Pago de inscripción (50%)' : 'Reserva de cupo'}</span>
               <strong className="text-emerald-700">{formatCOP(submittedData.totalPagarCOP)}</strong>
             </div>
           </div>
           <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-4">
-            Los {formatCOP(PRECIO_POR_JUGADOR_COP)} no se devuelven: con ese pago separamos el espacio de tu equipo. Puedes completar el resto de jugadores más adelante con los coordinadores.
+            {submittedData.pagoMitad ? (
+              <>
+                Pagaste la mitad del valor total del equipo ({formatCOP(submittedData.totalPagarCOP * 2)}). El saldo se
+                coordina con los organizadores. Este pago no se devuelve.
+              </>
+            ) : (
+              <>
+                Los {formatCOP(submittedData.totalPagarCOP)} no se devuelven: con ese pago separamos el espacio de tu
+                equipo. Si registras <strong>{getUmbralPagoMitad(submittedData.disciplina)} o más jugadores</strong>{' '}
+                (más de la mitad de la plantilla), pagas la mitad del valor total del equipo.
+              </>
+            )}
           </p>
           <p className="text-xs text-gray-400 mb-6">
-            Nos pondremos en contacto con el capitán para confirmar los detalles del torneo de microfútbol mixto.
+            Nos pondremos en contacto con el capitán para confirmar los detalles del torneo de Fútbol 5.
           </p>
           <button
             onClick={() => setSubmittedData(null)}
@@ -200,10 +260,27 @@ export default function TournamentForm() {
       <form onSubmit={handleSubmit(onSubmit)} className="max-w-2xl mx-auto px-4 py-8 space-y-5">
 
         <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5">
-          <h3 className="font-bold text-emerald-900 mb-2 text-base">💡 Reserva tu cupo con {formatCOP(PRECIO_POR_JUGADOR_COP)}</h3>
+          <h3 className="font-bold text-emerald-900 mb-2 text-base">
+            💡 {pagoMitad ? 'Más de la mitad de la plantilla — pagas el 50%' : `Reserva tu cupo con ${formatCOP(PRECIO_POR_JUGADOR_COP)}`}
+          </h3>
           <ul className="text-sm text-emerald-800 space-y-1.5 leading-relaxed">
             <li>
-              <strong>Costo del torneo: {formatCOP(PRECIO_POR_JUGADOR_COP)} por persona.</strong> No necesitas reunir a todo el equipo ni pagar por todos ahora: con la inscripción del capitán y el comprobante reservas el espacio.
+              <strong>Costo del torneo: {formatCOP(PRECIO_POR_JUGADOR_COP)} por persona.</strong>{' '}
+              {pagoMitad ? (
+                <>
+                  Con <strong>{umbralPagoMitad} o más jugadores</strong> (más de la mitad de los {maxJugadores}) pagas{' '}
+                  <strong>la mitad del valor total</strong> ({formatCOP(totalPagar)} de {formatCOP(valorTotalEquipo)}).
+                </>
+              ) : (
+                <>
+                  Con menos de {umbralPagoMitad} jugadores, el capitán paga {formatCOP(PRECIO_POR_JUGADOR_COP)} para
+                  reservar el espacio. A partir de {umbralPagoMitad} jugadores pagas solo la mitad del total.
+                </>
+              )}
+            </li>
+            <li>
+              <strong>Regla de pago:</strong> plantilla máxima {maxJugadores} jugadores — si inscribes{' '}
+              <strong>{umbralPagoMitad} o más</strong> (más de la mitad), pagas el 50% del valor de quienes registres.
             </li>
             <li>
               Ese dinero <strong>no se devuelve</strong>: con él separamos el cupo y organizamos el torneo.
@@ -212,8 +289,11 @@ export default function TournamentForm() {
               Cada equipo puede hacer <strong>{CAMBIOS_POR_EQUIPO} cambio</strong> de jugador durante el torneo (validado por los coordinadores).
             </li>
             <li>
-              Puedes agregar más jugadores ahora o más adelante. El día del partido se recomienda al menos{' '}
-              {MINIMOS['Microfútbol']} jugadores en Microfútbol.
+              Plantilla máxima de <strong>{getMaximoJugadores('Fútbol 5')}</strong> jugadores ({MINIMOS['Fútbol 5']} en cancha + {CAMBIOS_POR_EQUIPO} cambio). El día del partido se recomienda al menos{' '}
+              {MINIMOS['Fútbol 5']} en cancha.
+            </li>
+            <li>
+              Puedes agregar jugadores ahora o más adelante con los coordinadores, hasta completar la plantilla.
             </li>
           </ul>
         </div>
@@ -221,7 +301,7 @@ export default function TournamentForm() {
         {/* ── 1. Disciplina ── */}
         <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <h2 className="text-lg font-bold text-gray-900 mb-1">1. Selecciona la Disciplina</h2>
-          <p className="text-sm text-gray-500 mb-4">El torneo de Voleibol ya se celebró. Ahora solo está abierta la inscripción de Microfútbol mixto.</p>
+          <p className="text-sm text-gray-500 mb-4">El torneo de Voleibol ya se celebró. Ahora solo está abierta la inscripción de Fútbol 5 (masculino o mixto).</p>
           <div className="grid grid-cols-2 gap-4">
             <div className="relative rounded-xl border-2 border-gray-200 bg-gray-50 p-5 flex flex-col items-center gap-2 opacity-60">
               <span className="text-4xl">🏐</span>
@@ -232,22 +312,21 @@ export default function TournamentForm() {
               </span>
             </div>
             <label
-              className={`relative cursor-pointer rounded-xl border-2 p-5 flex flex-col items-center gap-2 transition-all ${
-                disciplina === 'Microfútbol'
+              className={`relative cursor-pointer rounded-xl border-2 p-5 flex flex-col items-center gap-2 transition-all ${disciplina === 'Fútbol 5'
                   ? 'border-emerald-500 bg-emerald-50 shadow-sm'
                   : 'border-gray-200 hover:border-gray-300 bg-white'
-              }`}
+                }`}
             >
-              <input type="radio" value="Microfútbol" {...register('disciplina')} className="sr-only" />
+              <input type="radio" value="Fútbol 5" {...register('disciplina')} className="sr-only" />
               <span className="text-4xl">⚽</span>
-              <span className="font-bold text-gray-900 text-base">Microfútbol</span>
+              <span className="font-bold text-gray-900 text-base">Fútbol 5</span>
               <span className="text-xs text-center text-gray-500">
-                {MINIMOS['Microfútbol']} en cancha
+                {MINIMOS['Fútbol 5']} en cancha · máx. {getMaximoJugadores('Fútbol 5')}
               </span>
-              <span className="text-xs text-center font-semibold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
-                👫 Mixto
+              <span className="text-xs text-center font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                👨👫 Masculino o mixto
               </span>
-              {disciplina === 'Microfútbol' && (
+              {disciplina === 'Fútbol 5' && (
                 <span className="absolute top-2.5 right-2.5 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center">
                   <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
@@ -256,16 +335,53 @@ export default function TournamentForm() {
               )}
             </label>
           </div>
-          {disciplina === 'Microfútbol' && (
-            <div className="mt-4 flex gap-3 p-3.5 bg-purple-50 border border-purple-200 rounded-xl text-sm text-purple-800">
-              <span className="text-lg flex-shrink-0">👫</span>
-              <div>
-                <p className="font-semibold mb-0.5">Torneo Mixto — Regla de género en cancha</p>
-                <p className="leading-relaxed">
-                  En todo momento debe haber al menos <strong>1 jugador/a del sexo opuesto</strong> en la cancha.
-                  Ejemplo: si hay 4 hombres, debe haber mínimo 1 mujer; si hay 4 mujeres, debe haber mínimo 1 hombre.
-                </p>
+          {disciplina === 'Fútbol 5' && (
+            <div className="mt-4">
+              <p className="text-sm font-semibold text-gray-800 mb-3">Modalidad de tu equipo</p>
+              <div className="grid grid-cols-2 gap-3">
+                {(['Masculino', 'Mixto'] as Modalidad[]).map((m) => (
+                  <label
+                    key={m}
+                    className={`relative cursor-pointer rounded-xl border-2 p-4 flex flex-col items-center gap-1.5 transition-all ${modalidad === m
+                        ? m === 'Mixto'
+                          ? 'border-purple-500 bg-purple-50 shadow-sm'
+                          : 'border-blue-500 bg-blue-50 shadow-sm'
+                        : 'border-gray-200 hover:border-gray-300 bg-white'
+                      }`}
+                  >
+                    <input
+                      type="radio"
+                      value={m}
+                      checked={modalidad === m}
+                      onChange={() => handleModalidadChange(m)}
+                      className="sr-only"
+                    />
+                    <span className="text-2xl">{m === 'Mixto' ? '👫' : '👨'}</span>
+                    <span className="font-bold text-gray-900 text-sm">{m}</span>
+                    <span className="text-[11px] text-center text-gray-500 leading-snug">
+                      {m === 'Mixto'
+                        ? 'Hombres y mujeres · regla en cancha'
+                        : 'Solo jugadores masculinos'}
+                    </span>
+                  </label>
+                ))}
               </div>
+              {modalidad === 'Mixto' && (
+                <div className="mt-3 flex gap-3 p-3.5 bg-purple-50 border border-purple-200 rounded-xl text-sm text-purple-800">
+                  <span className="text-lg flex-shrink-0">👫</span>
+                  <div>
+                    <p className="font-semibold mb-0.5">Regla de género en cancha</p>
+                    <p className="leading-relaxed">
+                      En todo momento debe haber al menos <strong>1 jugador/a del sexo opuesto</strong> en la cancha.
+                    </p>
+                  </div>
+                </div>
+              )}
+              {modalidad === 'Masculino' && (
+                <p className="mt-3 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-xl px-3 py-2">
+                  👨 Modalidad masculina: todos los jugadores del equipo deben ser hombres.
+                </p>
+              )}
             </div>
           )}
         </section>
@@ -291,7 +407,18 @@ export default function TournamentForm() {
         <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <h2 className="text-lg font-bold text-gray-900 mb-1">3. Datos del Capitán</h2>
           <p className="text-sm text-gray-500 mb-4">
-            Con tus datos y {formatCOP(PRECIO_POR_JUGADOR_COP)} reservas el cupo del equipo. Este pago no es reembolsable.
+            {pagoMitad ? (
+              <>
+                Con <strong>{totalJugadores} jugadores</strong> (más de la mitad de la plantilla) pagas{' '}
+                <strong>{formatCOP(totalPagar)}</strong> — el 50% del valor total del equipo. No es reembolsable.
+              </>
+            ) : (
+              <>
+                Con tus datos y <strong>{formatCOP(PRECIO_POR_JUGADOR_COP)}</strong> reservas el cupo. Si registras{' '}
+                <strong>{umbralPagoMitad} o más jugadores</strong> (más de la mitad de {maxJugadores}), pagas la mitad
+                del valor total. No es reembolsable.
+              </>
+            )}
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -347,6 +474,7 @@ export default function TournamentForm() {
               <GenderToggle
                 value={watch('capitan.genero') ?? 'Masculino'}
                 onChange={(g) => setValue('capitan.genero', g)}
+                soloMasculino={soloMasculino}
               />
             </div>
           </div>
@@ -357,18 +485,46 @@ export default function TournamentForm() {
           <div className="flex items-center justify-between mb-1">
             <h2 className="text-lg font-bold text-gray-900">4. Jugadores</h2>
             <span className="text-sm font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
-              {totalJugadores} {totalJugadores === 1 ? 'jugador' : 'jugadores'}
+              {totalJugadores}/{maxJugadores} {totalJugadores === 1 ? 'jugador' : 'jugadores'}
             </span>
           </div>
           <p className="text-sm text-gray-500 mb-4">
-            Opcional. Puedes reservar el cupo solo con el capitán y agregar al resto después. Si ya los tienes, añádelos acá.
-            El día del torneo se recomienda al menos <strong>{MINIMOS[disciplina]}</strong> jugadores para {disciplina}.
+            Opcional. Puedes reservar el cupo solo con el capitán y agregar al resto después (máximo{' '}
+            <strong>{maxJugadores}</strong> en plantilla: {MINIMOS[disciplina]} en cancha + {CAMBIOS_POR_EQUIPO} cambio).
+            Si registras <strong>{umbralPagoMitad} o más jugadores</strong> con nombre y documento (más de la mitad de{' '}
+            {maxJugadores}), pagas la mitad del valor total del equipo al inscribirte.
           </p>
-          {disciplina === 'Microfútbol' && (
+          {pagoMitad && (
+            <div className="mb-4 flex gap-2.5 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 leading-relaxed">
+              <span className="flex-shrink-0">✅</span>
+              <span>
+                <strong>Aplica 50%:</strong> con {totalJugadores} jugadores (≥ {umbralPagoMitad}) tu pago es{' '}
+                {formatCOP(totalPagar)} — mitad de {formatCOP(valorTotalEquipo)}.
+              </span>
+            </div>
+          )}
+          {!pagoMitad && totalJugadores > 0 && totalJugadores < umbralPagoMitad && (
+            <div className="mb-4 flex gap-2.5 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 leading-relaxed">
+              <span className="flex-shrink-0">💡</span>
+              <span>
+                Faltan {umbralPagoMitad - totalJugadores} jugador{umbralPagoMitad - totalJugadores !== 1 ? 'es' : ''} para
+                pagar la mitad ({umbralPagoMitad}+ de {maxJugadores}).
+              </span>
+            </div>
+          )}
+          {modalidad === 'Mixto' && (
             <div className="mb-4 flex gap-2.5 p-3 bg-purple-50 border border-purple-200 rounded-xl text-xs text-purple-700 leading-relaxed">
               <span className="flex-shrink-0">👫</span>
               <span>
-                <strong>Torneo Mixto:</strong> Registra jugadores y jugadoras. Recuerda que en cancha siempre debe haber al menos 1 persona del sexo opuesto a la mayoría.
+                <strong>Modalidad mixta:</strong> Registra jugadores y jugadoras. En cancha siempre debe haber al menos 1 persona del sexo opuesto a la mayoría.
+              </span>
+            </div>
+          )}
+          {modalidad === 'Masculino' && (
+            <div className="mb-4 flex gap-2.5 p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-700 leading-relaxed">
+              <span className="flex-shrink-0">👨</span>
+              <span>
+                <strong>Modalidad masculina:</strong> Todos los jugadores del equipo deben ser hombres.
               </span>
             </div>
           )}
@@ -421,6 +577,7 @@ export default function TournamentForm() {
                   <GenderToggle
                     value={(watch(`jugadores.${index}.genero`) as Genero) ?? 'Masculino'}
                     onChange={(g) => setValue(`jugadores.${index}.genero`, g)}
+                    soloMasculino={soloMasculino}
                   />
                 </div>
                 <button
@@ -440,12 +597,13 @@ export default function TournamentForm() {
           <button
             type="button"
             onClick={() => append({ nombre: '', documento: '', genero: 'Masculino' })}
-            className="mt-4 w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 rounded-xl py-3 text-sm font-medium text-gray-500 hover:border-emerald-400 hover:text-emerald-600 hover:bg-emerald-50 transition"
+            disabled={plantillaLlena}
+            className="mt-4 w-full flex items-center justify-center gap-2 border-2 border-dashed rounded-xl py-3 text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed border-gray-200 text-gray-500 hover:border-emerald-400 hover:text-emerald-600 hover:bg-emerald-50 disabled:hover:border-gray-200 disabled:hover:text-gray-500 disabled:hover:bg-transparent"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            Agregar jugador
+            {plantillaLlena ? `Plantilla completa (${maxJugadores} jugadores)` : 'Agregar jugador'}
           </button>
 
           {(() => {
@@ -472,18 +630,30 @@ export default function TournamentForm() {
               <span className="text-sm text-gray-700">Costo por jugador</span>
               <span className="text-sm font-bold text-gray-800">{formatCOP(PRECIO_POR_JUGADOR_COP)}</span>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-700">Reserva de cupo (capitán)</span>
-              <span className="text-base font-extrabold text-emerald-700">{formatCOP(totalPagar)}</span>
-            </div>
-            {totalJugadores > 1 && (
-              <div className="flex justify-between items-center text-xs text-gray-500 pt-1 border-t border-emerald-100">
-                <span>Total estimado del equipo ({totalJugadores} jug.)</span>
-                <span>{formatCOP(PRECIO_POR_JUGADOR_COP * totalJugadores)}</span>
+            {totalJugadores > 0 && (
+              <div className="flex justify-between items-center text-xs text-gray-500">
+                <span>Valor total del equipo ({totalJugadores} jug.)</span>
+                <span>{formatCOP(valorTotalEquipo)}</span>
               </div>
             )}
+            <div className="flex justify-between items-center pt-1 border-t border-emerald-100">
+              <span className="text-sm text-gray-700">
+                {pagoMitad ? 'Pago ahora (50% del total)' : 'Reserva de cupo (capitán)'}
+              </span>
+              <span className="text-base font-extrabold text-emerald-700">{formatCOP(totalPagar)}</span>
+            </div>
             <p className="text-xs text-emerald-700">
-              No pagas por cada jugador ahora. {formatCOP(PRECIO_POR_JUGADOR_COP)} del capitán separan el espacio del equipo y no son reembolsables. Cada equipo puede hacer {CAMBIOS_POR_EQUIPO} cambio de jugador.
+              {pagoMitad ? (
+                <>
+                  Con {totalJugadores} jugadores (≥ {umbralPagoMitad}): pagas el 50% del valor total. El saldo restante (
+                  {formatCOP(valorTotalEquipo - totalPagar)}) se coordina con los organizadores.
+                </>
+              ) : (
+                <>
+                  Con menos de {umbralPagoMitad} jugadores, {formatCOP(PRECIO_POR_JUGADOR_COP)} del capitán reservan el
+                  cupo. A partir de {umbralPagoMitad} jugadores pagas solo la mitad del total. No es reembolsable.
+                </>
+              )}
             </p>
           </div>
         </section>
@@ -492,22 +662,26 @@ export default function TournamentForm() {
         <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <h2 className="text-lg font-bold text-gray-900 mb-1">5. Comprobante de Pago</h2>
           <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 space-y-2">
-            <p className="font-semibold">💳 Paga {formatCOP(PRECIO_POR_JUGADOR_COP)} para reservar el cupo</p>
-            <p>
-              Transfiere el valor de <strong>una persona</strong> (el capitán) al medio indicado por los coordinadores
-              (Nequi / Daviplata / cuenta bancaria) y adjunta el screenshot o foto del comprobante.
+            <p className="font-semibold">
+              💳 Paga {formatCOP(totalPagar)}
+              {pagoMitad ? ' (50% — más de la mitad de la plantilla)' : ' para reservar el cupo'}
             </p>
             <p>
-              Con ese pago separamos el espacio de tu equipo para organizar el torneo.{' '}
+              Transfiere el monto indicado al medio señalado por los coordinadores (Nequi / Daviplata / cuenta bancaria)
+              y adjunta el screenshot o foto del comprobante.
+            </p>
+            <p>
               <strong>Este dinero no se devuelve.</strong>
+              {pagoMitad
+                ? ' El saldo restante se coordina con los organizadores.'
+                : ' Con ese pago separamos el espacio de tu equipo para organizar el torneo.'}
             </p>
           </div>
           <label
-            className={`flex flex-col items-center justify-center w-full h-36 border-2 border-dashed rounded-xl cursor-pointer transition ${
-              comprobanteFile
+            className={`flex flex-col items-center justify-center w-full h-36 border-2 border-dashed rounded-xl cursor-pointer transition ${comprobanteFile
                 ? 'border-emerald-400 bg-emerald-50'
                 : 'border-gray-300 hover:border-emerald-400 hover:bg-gray-50'
-            }`}
+              }`}
           >
             <input
               type="file"
@@ -553,12 +727,14 @@ export default function TournamentForm() {
             <input
               type="checkbox"
               {...register('reservaNoReembolsableAceptada', {
-                required: `Debes aceptar que la reserva de ${formatCOP(PRECIO_POR_JUGADOR_COP)} no es reembolsable`,
+                required: `Debes aceptar que el pago de ${formatCOP(totalPagar)} no es reembolsable`,
               })}
               className="mt-0.5 w-5 h-5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 flex-shrink-0"
             />
             <span className="text-sm text-gray-700">
-              Entiendo que los {formatCOP(PRECIO_POR_JUGADOR_COP)} del capitán reservan el cupo del equipo y <strong>no son reembolsables</strong>.
+              Entiendo que los {formatCOP(totalPagar)} de esta inscripción{' '}
+              {pagoMitad ? 'corresponden al 50% del valor del equipo y ' : 'reservan el cupo del equipo y '}
+              <strong>no son reembolsables</strong>.
             </span>
           </label>
           {errors.reservaNoReembolsableAceptada && (
@@ -582,11 +758,12 @@ export default function TournamentForm() {
               </p>
             </div>
             <p className="pt-1 border-t border-gray-200">
-              🔄 <strong>Cambios:</strong> Cada equipo puede hacer {CAMBIOS_POR_EQUIPO} cambio de jugador durante el torneo, sujeto a validación de los coordinadores.
+              🔄 <strong>Cambios:</strong> Cada equipo puede hacer {CAMBIOS_POR_EQUIPO} cambio de jugador durante el torneo. La plantilla máxima es de {maxJugadores} personas ({MINIMOS[disciplina]} en cancha + {CAMBIOS_POR_EQUIPO} cambio).
             </p>
-            {disciplina === 'Microfútbol' && (
+
+            {modalidad === 'Masculino' && (
               <p className="pt-1 border-t border-gray-200">
-                👫 <strong>Microfútbol Mixto:</strong> En cancha siempre debe haber mínimo 1 jugador/a del sexo opuesto a la mayoría. Incumplir esta regla puede resultar en descalificación del punto o del partido.
+                👨 <strong>Modalidad masculina:</strong> Solo participan jugadores hombres. Incumplir esta regla puede resultar en descalificación del equipo.
               </p>
             )}
           </div>

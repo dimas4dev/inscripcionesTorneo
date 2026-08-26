@@ -3,11 +3,9 @@
 import { useState, useEffect, useMemo, type ReactNode } from 'react';
 import { collection, deleteDoc, doc, getDocs, query, orderBy, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Inscripcion, Individual, Disciplina, Genero, Jugador, Capitan, ComprobantePago } from '@/lib/types';
+import { Inscripcion, Individual, Disciplina, Genero, Jugador, Capitan, ComprobantePago, isFutbol5, disciplinaLabel, modalidadLabel } from '@/lib/types';
 import { uploadComprobante } from '@/lib/uploadComprobante';
-import { PRECIO_POR_JUGADOR_COP } from '@/lib/constants';
-
-const MINIMOS: Record<Disciplina, number> = { Voleibol: 6, 'Microfútbol': 5 };
+import { PRECIO_POR_JUGADOR_COP, MINIMOS, CAMBIOS_POR_EQUIPO, getMinimoJugadores, getMaximoJugadores } from '@/lib/constants';
 
 function formatCOP(amount: number): string {
   return new Intl.NumberFormat('es-CO', {
@@ -101,6 +99,7 @@ function exportToCSV(data: Inscripcion[]) {
     'Fecha Inscripción',
     'Equipo',
     'Disciplina',
+    'Modalidad',
     'Fecha Torneo',
     'Capitán',
     'Documento Capitán',
@@ -120,6 +119,7 @@ function exportToCSV(data: Inscripcion[]) {
     ins.createdAt ? formatDate(ins.createdAt) : '',
     ins.equipoNombre,
     ins.disciplina,
+    modalidadLabel(ins.modalidad),
     ins.fechaTorneo,
     ins.capitan.nombre,
     ins.capitan.documento,
@@ -232,6 +232,8 @@ function PlayerModal({
   };
 
   const addPlayer = () => {
+    const maxPlantilla = getMaximoJugadores(inscripcion.disciplina);
+    if (draftPlayers.length >= maxPlantilla) return;
     setDraftPlayers((prev) => [
       ...prev,
       { id: generateId(), nombre: '', documento: '', esCapitan: false, genero: 'Masculino' },
@@ -266,6 +268,13 @@ function PlayerModal({
       setRosterError('Cada jugador adicional debe tener al menos el nombre.');
       return;
     }
+    const maxPlantilla = getMaximoJugadores(inscripcion.disciplina);
+    if (jugadores.length > maxPlantilla) {
+      setRosterError(
+        `La plantilla no puede superar ${maxPlantilla} jugadores (${getMinimoJugadores(inscripcion.disciplina)} en cancha + ${CAMBIOS_POR_EQUIPO} cambio).`
+      );
+      return;
+    }
 
     const capitan: Capitan = {
       ...inscripcion.capitan,
@@ -290,7 +299,8 @@ function PlayerModal({
     }
   };
 
-  const minRecomendado = MINIMOS[inscripcion.disciplina];
+  const minRecomendado = getMinimoJugadores(inscripcion.disciplina);
+  const maxPlantilla = getMaximoJugadores(inscripcion.disciplina);
   const plantillaIncompleta = inscripcion.totalJugadores < minRecomendado;
 
   return (
@@ -324,8 +334,19 @@ function PlayerModal({
                     : 'bg-blue-100 text-blue-700'
                 }`}
               >
-                {inscripcion.disciplina === 'Voleibol' ? '🏐' : '⚽'} {inscripcion.disciplina}
+                {inscripcion.disciplina === 'Voleibol' ? '🏐' : '⚽'} {disciplinaLabel(inscripcion.disciplina)}
               </span>
+              {isFutbol5(inscripcion.disciplina) && (
+                <span
+                  className={`inline-flex items-center gap-1 mt-1 ml-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                    inscripcion.modalidad === 'Mixto'
+                      ? 'bg-purple-100 text-purple-700'
+                      : 'bg-blue-100 text-blue-700'
+                  }`}
+                >
+                  {inscripcion.modalidad === 'Mixto' ? '👫' : '👨'} {modalidadLabel(inscripcion.modalidad)}
+                </span>
+              )}
             </div>
             <button
               onClick={onClose}
@@ -377,8 +398,7 @@ function PlayerModal({
           </div>
           {plantillaIncompleta && !editingRoster && (
             <p className="mb-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-              Solo está el capitán o faltan nombres. Se recomienda al menos {minRecomendado} jugadores para{' '}
-              {inscripcion.disciplina}. Usa <strong>Editar plantilla</strong> para agregarlos.
+              Solo está el capitán o faltan nombres. Se recomienda al menos {minRecomendado} jugadores en cancha (máx. {maxPlantilla} en plantilla). Usa <strong>Editar plantilla</strong> para agregarlos.
             </p>
           )}
           {/* Resumen M/F */}
@@ -492,12 +512,15 @@ function PlayerModal({
               <button
                 type="button"
                 onClick={addPlayer}
-                className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 rounded-xl py-2.5 text-sm font-medium text-gray-500 hover:border-emerald-400 hover:text-emerald-600 hover:bg-emerald-50 transition"
+                disabled={draftPlayers.length >= maxPlantilla}
+                className="w-full flex items-center justify-center gap-2 border-2 border-dashed rounded-xl py-2.5 text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed border-gray-200 text-gray-500 hover:border-emerald-400 hover:text-emerald-600 hover:bg-emerald-50 disabled:hover:border-gray-200 disabled:hover:text-gray-500 disabled:hover:bg-transparent"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
-                Agregar jugador
+                {draftPlayers.length >= maxPlantilla
+                  ? `Plantilla completa (${maxPlantilla} jugadores)`
+                  : 'Agregar jugador'}
               </button>
               {rosterError && (
                 <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-2.5 py-1.5">
@@ -739,7 +762,7 @@ function PaymentReviewModal({
             <div>
               <h3 className="text-lg font-bold text-gray-900">Revisar pagos</h3>
               <p className="text-sm text-gray-600 mt-0.5">
-                {inscripcion.equipoNombre} · {inscripcion.disciplina}
+                {inscripcion.equipoNombre} · {disciplinaLabel(inscripcion.disciplina)}
               </p>
             </div>
             <button
@@ -1069,11 +1092,11 @@ interface IndividualsPanelProps {
 
 function IndividualesPanel({ individuales, onRefresh, onRequestDelete }: IndividualsPanelProps) {
   const lista = useMemo(
-    () => individuales.filter((i) => i.disciplina === 'Microfútbol'),
+    () => individuales.filter((i) => isFutbol5(i.disciplina)),
     [individuales]
   );
   const count = lista.length;
-  const min = MINIMOS['Microfútbol'];
+  const min = MINIMOS['Fútbol 5'];
   const pct = Math.min((count / min) * 100, 100);
   const complete = count >= min;
   const masc = lista.filter((p) => p.genero === 'Masculino').length;
@@ -1082,7 +1105,7 @@ function IndividualesPanel({ individuales, onRefresh, onRequestDelete }: Individ
   return (
     <div className="space-y-5">
       <p className="text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">
-        El voleibol ya finalizó. Esta lista muestra solo Microfútbol mixto. El historial de voleibol sigue en Finanzas.
+        El voleibol ya finalizó. Esta lista muestra Fútbol 5 (masculino o mixto). El historial de voleibol sigue en Finanzas.
       </p>
       {/* Progreso de cupos */}
       <div className="grid grid-cols-1 gap-4">
@@ -1093,8 +1116,8 @@ function IndividualesPanel({ individuales, onRefresh, onRequestDelete }: Individ
         >
           <div className="flex items-center justify-between mb-3">
             <div>
-              <p className="font-bold text-gray-900">⚽ Microfútbol</p>
-              <p className="text-xs text-gray-500">Mixto</p>
+              <p className="font-bold text-gray-900">⚽ Fútbol 5</p>
+              <p className="text-xs text-gray-500">Masculino o mixto</p>
             </div>
             <span className={`text-2xl font-extrabold ${complete ? 'text-emerald-600' : 'text-gray-900'}`}>
               {count}<span className="text-sm font-normal text-gray-400">/{min}</span>
@@ -1148,7 +1171,7 @@ function IndividualesPanel({ individuales, onRefresh, onRequestDelete }: Individ
         {lista.length === 0 ? (
           <div className="text-center py-14 text-gray-400">
             <p className="text-4xl mb-3">👤</p>
-            <p className="font-medium">Aún no hay inscripciones individuales de microfútbol</p>
+            <p className="font-medium">Aún no hay inscripciones individuales de Fútbol 5</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -1160,6 +1183,7 @@ function IndividualesPanel({ individuales, onRefresh, onRequestDelete }: Individ
                   <th className="text-left px-4 py-3 font-semibold text-gray-500">Género</th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-500">Documento</th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-500">WhatsApp</th>
+                  <th className="text-left px-4 py-3 font-semibold text-gray-500">Modalidad</th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-500">Disciplina</th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-500">Fecha</th>
                   <th className="text-center px-4 py-3 font-semibold text-gray-500">Acciones</th>
@@ -1196,11 +1220,20 @@ function IndividualesPanel({ individuales, onRefresh, onRequestDelete }: Individ
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                        ind.modalidad === 'Mixto'
+                          ? 'bg-purple-100 text-purple-700'
+                          : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {ind.modalidad === 'Mixto' ? '👫' : '👨'} {modalidadLabel(ind.modalidad)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
                         ind.disciplina === 'Voleibol'
                           ? 'bg-emerald-100 text-emerald-700'
                           : 'bg-blue-100 text-blue-700'
                       }`}>
-                        {ind.disciplina === 'Voleibol' ? '🏐' : '⚽'} {ind.disciplina}
+                        {ind.disciplina === 'Voleibol' ? '🏐' : '⚽'} {disciplinaLabel(ind.disciplina)}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
@@ -1247,7 +1280,7 @@ type FinanceSlice = {
 
 interface FinanzasPanelProps {
   voleibol: FinanceSlice;
-  microfutbol: FinanceSlice;
+  futbol5: FinanceSlice;
   recaudadoTotal: number;
   premioTotal: number;
   gananciaTotal: number;
@@ -1257,7 +1290,7 @@ interface FinanzasPanelProps {
 
 function FinanzasPanel({
   voleibol,
-  microfutbol,
+  futbol5,
   recaudadoTotal,
   premioTotal,
   gananciaTotal,
@@ -1269,7 +1302,7 @@ function FinanzasPanel({
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
         <h2 className="text-base font-bold text-gray-900 mb-1">Consolidado de los dos torneos</h2>
         <p className="text-sm text-gray-500 mb-4">
-          Recaudo total y ganancia sumando voleibol y microfútbol. El premio de cada disciplina se calcula aparte (30% de lo recaudado en ese torneo).
+          Recaudo total y ganancia sumando voleibol y fútbol 5. El premio de cada disciplina se calcula aparte (30% de lo recaudado en ese torneo).
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="rounded-xl bg-amber-50 border border-amber-100 p-4">
@@ -1280,12 +1313,12 @@ function FinanzasPanel({
           <div className="rounded-xl bg-violet-50 border border-violet-100 p-4">
             <p className="text-xs font-medium text-violet-700 uppercase tracking-wide">Premios (suma de cada torneo)</p>
             <p className="text-2xl font-extrabold text-violet-900 mt-1">{formatCOP(premioTotal)}</p>
-            <p className="text-xs text-violet-700 mt-1">30% voleibol + 30% microfútbol</p>
+            <p className="text-xs text-violet-700 mt-1">30% voleibol + 30% fútbol 5</p>
           </div>
           <div className="rounded-xl bg-teal-50 border border-teal-100 p-4">
             <p className="text-xs font-medium text-teal-700 uppercase tracking-wide">Ganancia de los dos torneos</p>
             <p className="text-2xl font-extrabold text-teal-900 mt-1">{formatCOP(gananciaTotal)}</p>
-            <p className="text-xs text-teal-700 mt-1">70% voleibol + 70% microfútbol</p>
+            <p className="text-xs text-teal-700 mt-1">70% voleibol + 70% fútbol 5</p>
           </div>
         </div>
         {pendientesPago > 0 && (
@@ -1309,10 +1342,10 @@ function FinanzasPanel({
               muted: 'text-emerald-700',
             },
             {
-              key: 'microfutbol',
+              key: 'futbol5',
               emoji: '⚽',
-              label: 'Microfútbol',
-              data: microfutbol,
+              label: 'Fútbol 5',
+              data: futbol5,
               wrap: 'bg-blue-50 border-blue-100',
               title: 'text-blue-800',
               muted: 'text-blue-700',
@@ -1327,7 +1360,7 @@ function FinanzasPanel({
                   <p className={`text-xs mt-0.5 ${torneo.muted}`}>
                     {torneo.data.equipos} equipo{torneo.data.equipos !== 1 ? 's' : ''} · {torneo.data.jugadores} jugador
                     {torneo.data.jugadores !== 1 ? 'es' : ''}
-                    {torneo.key === 'microfutbol' ? ' · Mixto' : ''}
+                    {torneo.key === 'futbol5' ? ' · Masculino o mixto' : ''}
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1">
@@ -1495,11 +1528,11 @@ export default function AdminDashboard() {
   };
 
   const equiposActivos = useMemo(
-    () => inscripciones.filter((ins) => ins.disciplina === 'Microfútbol'),
+    () => inscripciones.filter((ins) => isFutbol5(ins.disciplina)),
     [inscripciones]
   );
   const individualesActivos = useMemo(
-    () => individuales.filter((ind) => ind.disciplina === 'Microfútbol'),
+    () => individuales.filter((ind) => isFutbol5(ind.disciplina)),
     [individuales]
   );
 
@@ -1518,7 +1551,9 @@ export default function AdminDashboard() {
 
   const stats = useMemo(() => {
     const byDisciplina = (disciplina: Disciplina) => {
-      const lista = inscripciones.filter((i) => i.disciplina === disciplina);
+      const lista = inscripciones.filter((i) =>
+        disciplina === 'Fútbol 5' ? isFutbol5(i.disciplina) : i.disciplina === disciplina
+      );
       const recaudado = lista.reduce((s, i) => s + i.totalPagarCOP, 0);
       const premio = Math.round(recaudado * 0.3);
       return {
@@ -1532,19 +1567,19 @@ export default function AdminDashboard() {
     };
 
     const voleibol = byDisciplina('Voleibol');
-    const microfutbol = byDisciplina('Microfútbol');
-    const recaudadoTotal = voleibol.recaudado + microfutbol.recaudado;
-    const premioTotal = voleibol.premio + microfutbol.premio;
-    const gananciaTotal = voleibol.ganancia + microfutbol.ganancia;
+    const futbol5 = byDisciplina('Fútbol 5');
+    const recaudadoTotal = voleibol.recaudado + futbol5.recaudado;
+    const premioTotal = voleibol.premio + futbol5.premio;
+    const gananciaTotal = voleibol.ganancia + futbol5.ganancia;
 
     return {
       voleibol,
-      microfutbol,
+      futbol5,
       recaudadoTotal,
       premioTotal,
       gananciaTotal,
-      totalEquipos: voleibol.equipos + microfutbol.equipos,
-      pendientesPago: voleibol.pendientesPago + microfutbol.pendientesPago,
+      totalEquipos: voleibol.equipos + futbol5.equipos,
+      pendientesPago: voleibol.pendientesPago + futbol5.pendientesPago,
     };
   }, [inscripciones]);
 
@@ -1620,7 +1655,7 @@ service cloud.firestore {
                 {tab.count}
               </span>
               )}
-              {tab.id === 'individuales' && individualesActivos.length > 0 && individualesActivos.length >= MINIMOS['Microfútbol'] && (
+              {tab.id === 'individuales' && individualesActivos.length > 0 && individualesActivos.length >= MINIMOS['Fútbol 5'] && (
                   <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" title="¡Cupo completo!" />
               )}
             </button>
@@ -1631,7 +1666,7 @@ service cloud.firestore {
       {activeTab === 'finanzas' ? (
         <FinanzasPanel
           voleibol={stats.voleibol}
-          microfutbol={stats.microfutbol}
+          futbol5={stats.futbol5}
           recaudadoTotal={stats.recaudadoTotal}
           premioTotal={stats.premioTotal}
           gananciaTotal={stats.gananciaTotal}
@@ -1650,7 +1685,7 @@ service cloud.firestore {
       ) : (
       <>
       <p className="text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 mb-4">
-        El voleibol ya finalizó. Aquí solo aparecen equipos de Microfútbol mixto. El recaudo de voleibol se mantiene en Finanzas.
+        El voleibol ya finalizó. Aquí solo aparecen equipos de Fútbol 5 (masculino o mixto). El recaudo de voleibol se mantiene en Finanzas.
       </p>
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
         <div className="flex flex-col sm:flex-row gap-3">
@@ -1694,7 +1729,7 @@ service cloud.firestore {
         </div>
         {filtered.length !== equiposActivos.length && (
           <p className="text-xs text-gray-400 mt-2">
-            Mostrando {filtered.length} de {equiposActivos.length} equipos de microfútbol
+            Mostrando {filtered.length} de {equiposActivos.length} equipos de Fútbol 5
           </p>
         )}
       </div>
@@ -1706,7 +1741,7 @@ service cloud.firestore {
             <p className="text-5xl mb-3">📋</p>
             <p className="font-medium">
               {equiposActivos.length === 0
-                ? 'No hay equipos de microfútbol inscritos aún'
+                ? 'No hay equipos de Fútbol 5 inscritos aún'
                 : 'Sin resultados para esta búsqueda'}
             </p>
           </div>
@@ -1718,6 +1753,7 @@ service cloud.firestore {
                   <th className="text-left px-4 py-3 font-semibold text-gray-500">#</th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-500">Equipo</th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-500">Disciplina</th>
+                  <th className="text-left px-4 py-3 font-semibold text-gray-500">Modalidad</th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-500">Capitán</th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-500">WhatsApp</th>
                   <th className="text-center px-4 py-3 font-semibold text-gray-500">Jug.</th>
@@ -1742,7 +1778,16 @@ service cloud.firestore {
                             : 'bg-blue-100 text-blue-700'
                         }`}
                       >
-                        {ins.disciplina === 'Voleibol' ? '🏐' : '⚽'} {ins.disciplina}
+                        {ins.disciplina === 'Voleibol' ? '🏐' : '⚽'} {disciplinaLabel(ins.disciplina)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
+                        ins.modalidad === 'Mixto'
+                          ? 'bg-purple-100 text-purple-700'
+                          : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {ins.modalidad === 'Mixto' ? '👫' : '👨'} {modalidadLabel(ins.modalidad)}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-gray-700 max-w-[130px] truncate">{ins.capitan.nombre}</td>
@@ -1769,7 +1814,7 @@ service cloud.firestore {
                         <span className="inline-flex items-center justify-center w-7 h-7 bg-gray-100 rounded-full text-xs font-bold text-gray-700">
                           {ins.totalJugadores}
                         </span>
-                        {ins.totalJugadores < MINIMOS[ins.disciplina] && (
+                        {ins.totalJugadores < getMinimoJugadores(ins.disciplina) && (
                           <span className="text-[10px] font-semibold text-amber-700">Incompleta</span>
                         )}
                       </button>

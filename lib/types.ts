@@ -1,8 +1,26 @@
 import { Timestamp } from 'firebase/firestore';
 
-export type Disciplina = 'Voleibol' | 'Microfútbol';
+export type Disciplina = 'Voleibol' | 'Fútbol 5';
+export type DisciplinaStored = Disciplina | 'Microfútbol';
 export type FechaTorneo = '2026-08-22' | '2026-08-23';
 export type Genero = 'Masculino' | 'Femenino';
+export type Modalidad = 'Masculino' | 'Mixto';
+
+export const DISCIPLINA_FUTBOL_5: Disciplina = 'Fútbol 5';
+
+export function isFutbol5(disciplina: string): boolean {
+  return disciplina === 'Fútbol 5' || disciplina === 'Microfútbol';
+}
+
+export function disciplinaLabel(disciplina: string): string {
+  if (disciplina === 'Microfútbol') return 'Fútbol 5';
+  return disciplina;
+}
+
+export function modalidadLabel(modalidad?: Modalidad): string {
+  if (modalidad === 'Mixto') return 'Mixto';
+  return 'Masculino';
+}
 
 export interface Capitan {
   nombre: string;
@@ -29,7 +47,8 @@ export interface ComprobantePago {
 export interface Inscripcion {
   id?: string;
   equipoNombre: string;
-  disciplina: Disciplina;
+  disciplina: DisciplinaStored;
+  modalidad?: Modalidad;
   fechaTorneo: FechaTorneo;
   capitan: Capitan;
   jugadores: Jugador[];
@@ -40,6 +59,7 @@ export interface Inscripcion {
   reglamentoAceptado: boolean;
   reservaCupo?: boolean;
   reservaNoReembolsableAceptada?: boolean;
+  equipoCompletoAlInscribir?: boolean;
   montoOriginalCOP?: number;
   pagoVerificado?: boolean;
   createdAt?: Timestamp;
@@ -54,6 +74,7 @@ export interface JugadorFormField {
 export interface FormValues {
   equipoNombre: string;
   disciplina: Disciplina;
+  modalidad: Modalidad;
   capitan: Capitan;
   jugadores: JugadorFormField[];
   reglamentoAceptado: boolean;
@@ -66,7 +87,8 @@ export interface Individual {
   documento: string;
   telefono: string;
   email: string;
-  disciplina: Disciplina;
+  disciplina: DisciplinaStored;
+  modalidad?: Modalidad;
   genero: Genero;
   createdAt?: Timestamp;
 }

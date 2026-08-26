@@ -3,7 +3,7 @@
 Web App de inscripción para el **Torneo Ágape 2026** del Ministerio Jahems y Esneth Ordóñez.
 
 - **Voleibol** · Sábado 22 de Agosto de 2026
-- **Microfútbol** · Domingo 23 de Agosto de 2026
+- **Fútbol 5** · Domingo 23 de Agosto de 2026
 - **Ubicación:** Carrera 56, Provivienda Oriental, Bogotá
 - **Costo:** $25.000 COP / jugador · 1 cambio por equipo
 - **Coordinadores:** Nicolás Mantilla, Jeronimo Roa y Lina Umana

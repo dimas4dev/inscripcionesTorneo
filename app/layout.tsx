@@ -10,7 +10,7 @@ const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "https://inscripcionestorne
 export const metadata: Metadata = {
   title: "Torneo Ágape 2026 — Inscripciones",
   description:
-    "Reserva el cupo de tu equipo en el Torneo Ágape 2026. ⚽ Microfútbol mixto. El Ministerio Ordóñez.",
+    "Reserva el cupo de tu equipo en el Torneo Ágape 2026. ⚽ Fútbol 5 · masculino o mixto. El Ministerio Ordóñez.",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
         url: `${BASE_URL}/og-image.png`,
         width: 1200,
         height: 630,
-        alt: "Torneo Ágape 2026 — Microfútbol mixto",
+        alt: "Torneo Ágape 2026 — Fútbol 5",
       },
     ],
     locale: "es_CO",
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "⚡ Torneo Ágape 2026 — ¡Inscribe tu equipo!",
     description:
-      "⚽ Microfútbol mixto · El Ministerio Ordóñez",
+      "⚽ Fútbol 5 · masculino o mixto · El Ministerio Ordóñez",
     images: [`${BASE_URL}/og-image.png`],
   },
 };
