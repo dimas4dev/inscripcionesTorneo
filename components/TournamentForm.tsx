@@ -5,7 +5,7 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Disciplina, Genero, FormValues, DISCIPLINA_FUTBOL_5, Modalidad } from '@/lib/types';
-import { PRECIO_POR_JUGADOR_COP, INSCRIPCION_TORNEO_COP, PAGO_INSCRIPCION_MITAD_COP, SALDO_INSCRIPCION_COP, CAMBIOS_POR_EQUIPO, formatCOP, MINIMOS, calificaPagoMitad, getMaximoJugadores, getUmbralPagoMitad } from '@/lib/constants';
+import { PRECIO_POR_JUGADOR_COP, INSCRIPCION_TORNEO_COP, PAGO_INSCRIPCION_MITAD_COP, PREMIO_TORNEO_COP, SALDO_INSCRIPCION_COP, CAMBIOS_POR_EQUIPO, formatCOP, MINIMOS, calificaPagoMitad, getMaximoJugadores, getUmbralPagoMitad } from '@/lib/constants';
 import { uploadComprobante as uploadComprobanteFile } from '@/lib/uploadComprobante';
 
 const FECHAS: Record<Disciplina, string> = {
@@ -253,9 +253,12 @@ export default function TournamentForm() {
 
         <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5">
           <h3 className="font-bold text-emerald-900 mb-2 text-base">
-            💡 Inscripción: abona el 50% ({formatCOP(PAGO_INSCRIPCION_MITAD_COP)})
+            💡 Inscripción: abona el 50% ({formatCOP(PAGO_INSCRIPCION_MITAD_COP)}) · Premio {formatCOP(PREMIO_TORNEO_COP)}
           </h3>
           <ul className="text-sm text-emerald-800 space-y-1.5 leading-relaxed">
+            <li>
+              <strong>Premio al campeón: {formatCOP(PREMIO_TORNEO_COP)}.</strong>
+            </li>
             <li>
               <strong>Inscripción del torneo: {formatCOP(INSCRIPCION_TORNEO_COP)} por equipo</strong> ({formatCOP(PRECIO_POR_JUGADOR_COP)} por persona).
               Debes registrar al menos <strong>{umbralPagoMitad} jugadores</strong> (más de la mitad de los {maxJugadores}) y

@@ -5,7 +5,7 @@ import { collection, deleteDoc, doc, getDocs, query, orderBy, updateDoc } from '
 import { db } from '@/lib/firebase';
 import { Inscripcion, Individual, Disciplina, Genero, Jugador, Capitan, ComprobantePago, isFutbol5, disciplinaLabel, modalidadLabel } from '@/lib/types';
 import { uploadComprobante } from '@/lib/uploadComprobante';
-import { PRECIO_POR_JUGADOR_COP, MINIMOS, CAMBIOS_POR_EQUIPO, getMinimoJugadores, getMaximoJugadores } from '@/lib/constants';
+import { PRECIO_POR_JUGADOR_COP, MINIMOS, CAMBIOS_POR_EQUIPO, PREMIO_FUTBOL5_COP, calcularFinanzasTorneo, getMinimoJugadores, getMaximoJugadores } from '@/lib/constants';
 
 function formatCOP(amount: number): string {
   return new Intl.NumberFormat('es-CO', {
@@ -1302,7 +1302,8 @@ function FinanzasPanel({
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
         <h2 className="text-base font-bold text-gray-900 mb-1">Consolidado de los dos torneos</h2>
         <p className="text-sm text-gray-500 mb-4">
-          Recaudo total y ganancia sumando voleibol y fútbol 5. El premio de cada disciplina se calcula aparte (30% de lo recaudado en ese torneo).
+          Recaudo total y ganancia sumando voleibol y fútbol 5. Voleibol mantiene premio al 30% de su recaudo
+          (torneo finalizado). Fútbol 5 tiene premio fijo de {formatCOP(PREMIO_FUTBOL5_COP)}.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="rounded-xl bg-amber-50 border border-amber-100 p-4">
@@ -1313,12 +1314,14 @@ function FinanzasPanel({
           <div className="rounded-xl bg-violet-50 border border-violet-100 p-4">
             <p className="text-xs font-medium text-violet-700 uppercase tracking-wide">Premios (suma de cada torneo)</p>
             <p className="text-2xl font-extrabold text-violet-900 mt-1">{formatCOP(premioTotal)}</p>
-            <p className="text-xs text-violet-700 mt-1">30% voleibol + 30% fútbol 5</p>
+            <p className="text-xs text-violet-700 mt-1">
+              30% voleibol + {formatCOP(PREMIO_FUTBOL5_COP)} fútbol 5
+            </p>
           </div>
           <div className="rounded-xl bg-teal-50 border border-teal-100 p-4">
             <p className="text-xs font-medium text-teal-700 uppercase tracking-wide">Ganancia de los dos torneos</p>
             <p className="text-2xl font-extrabold text-teal-900 mt-1">{formatCOP(gananciaTotal)}</p>
-            <p className="text-xs text-teal-700 mt-1">70% voleibol + 70% fútbol 5</p>
+            <p className="text-xs text-teal-700 mt-1">Suma de ganancias por torneo</p>
           </div>
         </div>
         {pendientesPago > 0 && (
@@ -1340,6 +1343,8 @@ function FinanzasPanel({
               wrap: 'bg-emerald-50 border-emerald-100',
               title: 'text-emerald-800',
               muted: 'text-emerald-700',
+              premioLabel: 'Premio 30%',
+              gananciaLabel: 'Ganancia 70%',
             },
             {
               key: 'futbol5',
@@ -1349,6 +1354,8 @@ function FinanzasPanel({
               wrap: 'bg-blue-50 border-blue-100',
               title: 'text-blue-800',
               muted: 'text-blue-700',
+              premioLabel: `Premio ${formatCOP(PREMIO_FUTBOL5_COP)}`,
+              gananciaLabel: 'Ganancia',
             },
           ] as const).map((torneo) => (
             <div key={torneo.key} className={`rounded-xl border p-5 ${torneo.wrap}`}>
@@ -1382,11 +1389,11 @@ function FinanzasPanel({
                   <p className={`text-lg font-extrabold ${torneo.title}`}>{formatCOP(torneo.data.recaudado)}</p>
                 </div>
                 <div>
-                  <p className={`text-[11px] font-medium uppercase tracking-wide ${torneo.muted}`}>Premio 30%</p>
+                  <p className={`text-[11px] font-medium uppercase tracking-wide ${torneo.muted}`}>{torneo.premioLabel}</p>
                   <p className={`text-lg font-extrabold ${torneo.title}`}>{formatCOP(torneo.data.premio)}</p>
                 </div>
                 <div>
-                  <p className={`text-[11px] font-medium uppercase tracking-wide ${torneo.muted}`}>Ganancia 70%</p>
+                  <p className={`text-[11px] font-medium uppercase tracking-wide ${torneo.muted}`}>{torneo.gananciaLabel}</p>
                   <p className={`text-lg font-extrabold ${torneo.title}`}>{formatCOP(torneo.data.ganancia)}</p>
                 </div>
               </div>
@@ -1555,13 +1562,13 @@ export default function AdminDashboard() {
         disciplina === 'Fútbol 5' ? isFutbol5(i.disciplina) : i.disciplina === disciplina
       );
       const recaudado = lista.reduce((s, i) => s + i.totalPagarCOP, 0);
-      const premio = Math.round(recaudado * 0.3);
+      const { premio, ganancia } = calcularFinanzasTorneo(recaudado, disciplina);
       return {
         equipos: lista.length,
         jugadores: lista.reduce((s, i) => s + i.totalJugadores, 0),
         recaudado,
         premio,
-        ganancia: recaudado - premio,
+        ganancia,
         pendientesPago: lista.filter((i) => !i.pagoVerificado).length,
       };
     };

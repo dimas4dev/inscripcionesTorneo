@@ -1,4 +1,4 @@
-import { PRECIO_POR_JUGADOR_COP, INSCRIPCION_TORNEO_COP, PAGO_INSCRIPCION_MITAD_COP, CAMBIOS_POR_EQUIPO, formatCOP, MINIMOS, getMaximoJugadores, getUmbralPagoMitad } from '@/lib/constants';
+import { PRECIO_POR_JUGADOR_COP, INSCRIPCION_TORNEO_COP, PAGO_INSCRIPCION_MITAD_COP, PREMIO_TORNEO_COP, CAMBIOS_POR_EQUIPO, formatCOP, MINIMOS, getMaximoJugadores, getUmbralPagoMitad } from '@/lib/constants';
 
 export default function HeroBanner() {
   return (
@@ -22,7 +22,7 @@ export default function HeroBanner() {
           Coordinadores: Nicolás Mantilla, Jeronimo Roa y Lina Umaña
         </p>
         <p className="mt-3 mx-auto max-w-md text-emerald-100/90 text-xs leading-relaxed">
-          Inscripción del torneo: {formatCOP(INSCRIPCION_TORNEO_COP)} por equipo ({formatCOP(PRECIO_POR_JUGADOR_COP)} por persona). Plantilla máxima de {getMaximoJugadores('Fútbol 5')} jugadores ({MINIMOS['Fútbol 5']} en cancha + {CAMBIOS_POR_EQUIPO} cambio). Inscríbete en modalidad masculina o mixta con al menos {getUmbralPagoMitad('Fútbol 5')} jugadores y abona el 50% ({formatCOP(PAGO_INSCRIPCION_MITAD_COP)}). No es reembolsable.
+          🏆 Premio al campeón: {formatCOP(PREMIO_TORNEO_COP)}. Inscripción del torneo: {formatCOP(INSCRIPCION_TORNEO_COP)} por equipo ({formatCOP(PRECIO_POR_JUGADOR_COP)} por persona). Plantilla máxima de {getMaximoJugadores('Fútbol 5')} jugadores ({MINIMOS['Fútbol 5']} en cancha + {CAMBIOS_POR_EQUIPO} cambio). Inscríbete en modalidad masculina o mixta con al menos {getUmbralPagoMitad('Fútbol 5')} jugadores y abona el 50% ({formatCOP(PAGO_INSCRIPCION_MITAD_COP)}). No es reembolsable.
         </p>
         <p className="mt-2 mx-auto max-w-md text-emerald-200/80 text-xs leading-relaxed">
           Este torneo es un espacio de integración y sana convivencia. No se admiten jugadores piratas ni semiprofesionales.
