@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
-import { PRECIO_POR_JUGADOR_COP, INSCRIPCION_TORNEO_COP, formatCOP } from "@/lib/constants";
+import { INSCRIPCION_TORNEO_COP, PAGO_INSCRIPCION_MITAD_COP, formatCOP } from "@/lib/constants";
 import "./globals.css";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
@@ -8,25 +8,25 @@ const geist = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "https://inscripcionestorneo.vercel.app";
 
 export const metadata: Metadata = {
-  title: "Torneo Ágape 2026 — Inscripciones",
+  title: "Torneo Relámpago — Inscripciones",
   description:
-    "Inscribe tu equipo en el Torneo Ágape 2026. ⚽ Fútbol 5 · masculino o mixto. El Ministerio Ordóñez.",
+    "Inscribe tu equipo en el Torneo Relámpago. ⚽ Fútbol 5 · masculino. Pastores Gómez.",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
   },
   openGraph: {
-    title: "⚡ Torneo Ágape 2026 — ¡Inscribe tu equipo!",
+    title: "⚡ Torneo Relámpago — ¡Inscribe tu equipo!",
     description:
-      `${formatCOP(INSCRIPCION_TORNEO_COP)} inscripción por equipo · ${formatCOP(PRECIO_POR_JUGADOR_COP)} por persona`,
+      `${formatCOP(INSCRIPCION_TORNEO_COP)} inscripción por equipo · se asegura con ${formatCOP(PAGO_INSCRIPCION_MITAD_COP)}`,
     url: BASE_URL,
-    siteName: "Torneo Ágape 2026",
+    siteName: "Torneo Relámpago",
     images: [
       {
         url: `${BASE_URL}/og-image.png`,
         width: 1200,
         height: 630,
-        alt: "Torneo Ágape 2026 — Fútbol 5",
+        alt: "Torneo Relámpago — Fútbol 5",
       },
     ],
     locale: "es_CO",
@@ -34,9 +34,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "⚡ Torneo Ágape 2026 — ¡Inscribe tu equipo!",
+    title: "⚡ Torneo Relámpago — ¡Inscribe tu equipo!",
     description:
-      "⚽ Fútbol 5 · masculino o mixto · El Ministerio Ordóñez",
+      "⚽ Fútbol 5 · masculino · Pastores Gómez",
     images: [`${BASE_URL}/og-image.png`],
   },
 };

@@ -3,17 +3,24 @@ import { isFutbol5 } from './types';
 
 export const PRECIO_POR_JUGADOR_COP = 25_000;
 /** Valor total de la inscripción del equipo al torneo. */
-export const INSCRIPCION_TORNEO_COP = 125_000;
-/** 50% de la inscripción — monto a abonar al inscribirse. */
+export const INSCRIPCION_TORNEO_COP = 200_000;
+/** Mitad de la inscripción: monto para asegurar el cupo. */
 export const PAGO_INSCRIPCION_MITAD_COP = INSCRIPCION_TORNEO_COP / 2;
 export const SALDO_INSCRIPCION_COP = INSCRIPCION_TORNEO_COP - PAGO_INSCRIPCION_MITAD_COP;
-/** Premio fijo del torneo de Fútbol 5 para el equipo campeón. */
-export const PREMIO_FUTBOL5_COP = 500_000;
-/** @deprecated Usar PREMIO_FUTBOL5_COP */
-export const PREMIO_TORNEO_COP = PREMIO_FUTBOL5_COP;
+/** Campeón, subcampeón y tercer lugar del Torneo Relámpago. */
+export const PREMIOS_TORNEO = [
+  { lugar: 'Campeón', montoCOP: 400_000 },
+  { lugar: 'Subcampeón', montoCOP: 200_000 },
+  { lugar: 'Tercer lugar', montoCOP: 100_000 },
+] as const;
+/** Suma de los tres premios de Fútbol 5. */
+export const PREMIO_FUTBOL5_COP = PREMIOS_TORNEO.reduce((total, premio) => total + premio.montoCOP, 0);
+/** @deprecated Usar PREMIOS_TORNEO. Conserva el premio del campeón. */
+export const PREMIO_TORNEO_COP = PREMIOS_TORNEO[0].montoCOP;
 /** Voleibol (finalizado): premio = 30% del recaudado de ese torneo. */
 export const PREMIO_VOLEIBOL_PORCENTAJE = 0.3;
-export const CAMBIOS_POR_EQUIPO = 1;
+/** Suplentes por equipo en Fútbol 5. */
+export const CAMBIOS_POR_EQUIPO = 3;
 
 export const MINIMOS: Record<Disciplina, number> = { Voleibol: 6, 'Fútbol 5': 5 };
 export const MAXIMOS: Record<Disciplina, number> = {
@@ -71,4 +78,11 @@ export function formatCOP(amount: number): string {
     currency: 'COP',
     maximumFractionDigits: 0,
   }).format(amount);
+}
+
+/** "Campeón $400.000, Subcampeón $200.000 y Tercer lugar $100.000" */
+export function textoPremiosTorneo(): string {
+  const partes = PREMIOS_TORNEO.map((premio) => `${premio.lugar} ${formatCOP(premio.montoCOP)}`);
+  if (partes.length <= 1) return partes[0] ?? '';
+  return `${partes.slice(0, -1).join(', ')} y ${partes[partes.length - 1]}`;
 }

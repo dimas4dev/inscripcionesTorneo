@@ -52,7 +52,7 @@ export default function AdminPage() {
             </div>
             <div>
               <h1 className="font-extrabold text-gray-900 leading-none">Mesa de Control</h1>
-              <p className="text-xs text-gray-500">Torneo Ágape 2026</p>
+              <p className="text-xs text-gray-500">Torneo Relámpago</p>
             </div>
           </div>
           <div className="flex items-center gap-3">

@@ -35,21 +35,15 @@ export default function IndividualForm() {
   });
 
   const disciplina = watch('disciplina');
-  const modalidad = watch('modalidad');
   const genero = watch('genero');
-
-  const handleModalidadChange = (next: Modalidad) => {
-    setValue('modalidad', next);
-    if (next === 'Masculino') setValue('genero', 'Masculino');
-  };
 
   const onSubmit = async (data: IndividualFormValues) => {
     if (data.disciplina === 'Voleibol') {
       setError('Las inscripciones de Voleibol ya están cerradas. El torneo se celebró.');
       return;
     }
-    if (data.modalidad === 'Masculino' && data.genero !== 'Masculino') {
-      setError('En modalidad masculina debes ser hombre.');
+    if (data.genero !== 'Masculino') {
+      setError('Este torneo es masculino: solo pueden anotarse hombres.');
       return;
     }
     setSubmitting(true);
@@ -61,7 +55,7 @@ export default function IndividualForm() {
         telefono: data.telefono,
         email: data.email,
         disciplina: data.disciplina,
-        modalidad: data.modalidad,
+        modalidad: 'Masculino',
         genero: data.genero,
         reglamentoAceptado: data.reglamentoAceptado,
         createdAt: serverTimestamp(),
@@ -93,7 +87,7 @@ export default function IndividualForm() {
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 text-sm text-amber-800 text-left space-y-2">
             <p className="font-semibold">📋 ¿Qué sigue?</p>
             <p>
-              Los coordinadores están reuniendo participantes individuales. Si se completa el cupo mínimo de{' '}
+              Los encargados están reuniendo participantes individuales. Si se completa el cupo mínimo de{' '}
               <strong>{MINIMOS[submittedDisciplina]} personas</strong> para {submittedDisciplina}, te contactarán
               por WhatsApp para confirmar tu participación y coordinar el pago de {formatCOP(PRECIO_POR_JUGADOR_COP)}.
             </p>
@@ -121,10 +115,10 @@ export default function IndividualForm() {
         </h3>
         <ul className="text-sm text-amber-800 space-y-1.5 leading-relaxed list-none">
           <li>
-            <strong>1.</strong> Te anotas en la lista de Fútbol 5 ({formatCOP(PRECIO_POR_JUGADOR_COP)} por persona), en modalidad masculina o mixta.
+            <strong>1.</strong> Te anotas en la lista de Fútbol 5 masculino ({formatCOP(PRECIO_POR_JUGADOR_COP)} por persona).
           </li>
           <li>
-            <strong>2.</strong> Los coordinadores reúnen a los individuales y forman equipos cuando hay cupo
+            <strong>2.</strong> Los encargados reúnen a los individuales y forman equipos cuando hay cupo
             suficiente ({MINIMOS['Fútbol 5']} mín. en cancha, máx. {getMaximoJugadores('Fútbol 5')} en plantilla).
           </li>
           <li>
@@ -142,17 +136,9 @@ export default function IndividualForm() {
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         {/* Disciplina */}
         <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h2 className="text-lg font-bold text-gray-900 mb-1">1. ¿En qué disciplina quieres participar?</h2>
-          <p className="text-sm text-gray-500 mb-4">El torneo de Voleibol ya se celebró. Ahora solo está abierta la lista de Fútbol 5 (masculino o mixto).</p>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="relative rounded-xl border-2 border-gray-200 bg-gray-50 p-5 flex flex-col items-center gap-2 opacity-60">
-              <span className="text-4xl">🏐</span>
-              <span className="font-bold text-gray-900">Voleibol</span>
-              <span className="text-xs text-center text-gray-500">Sáb. 22 Ago</span>
-              <span className="text-xs text-center font-semibold px-2 py-0.5 rounded-full bg-gray-200 text-gray-600">
-                Inscripciones cerradas
-              </span>
-            </div>
+          <h2 className="text-lg font-bold text-gray-900 mb-1">1. Disciplina</h2>
+          <p className="text-sm text-gray-500 mb-4">La lista está abierta para Fútbol 5 masculino.</p>
+          <div className="grid grid-cols-1 gap-4">
             <label
               className={`relative cursor-pointer rounded-xl border-2 p-5 flex flex-col items-center gap-2 transition-all ${
                 disciplina === 'Fútbol 5'
@@ -175,40 +161,9 @@ export default function IndividualForm() {
               )}
             </label>
           </div>
-          {disciplina === 'Fútbol 5' && (
-            <div className="mt-4">
-              <p className="text-sm font-semibold text-gray-800 mb-3">¿En qué modalidad quieres jugar?</p>
-              <div className="grid grid-cols-2 gap-3">
-                {(['Masculino', 'Mixto'] as Modalidad[]).map((m) => (
-                  <label
-                    key={m}
-                    className={`relative cursor-pointer rounded-xl border-2 p-4 flex flex-col items-center gap-1.5 transition-all ${
-                      modalidad === m
-                        ? m === 'Mixto'
-                          ? 'border-purple-500 bg-purple-50 shadow-sm'
-                          : 'border-blue-500 bg-blue-50 shadow-sm'
-                        : 'border-gray-200 hover:border-gray-300 bg-white'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      value={m}
-                      checked={modalidad === m}
-                      onChange={() => handleModalidadChange(m)}
-                      className="sr-only"
-                    />
-                    <span className="text-2xl">{m === 'Mixto' ? '👫' : '👨'}</span>
-                    <span className="font-bold text-gray-900 text-sm">{m}</span>
-                  </label>
-                ))}
-              </div>
-              {modalidad === 'Mixto' && (
-                <p className="mt-3 text-xs text-purple-700 bg-purple-50 border border-purple-200 rounded-xl px-3 py-2">
-                  👫 En modalidad mixta, en cancha debe haber mínimo 1 persona del sexo opuesto a la mayoría.
-                </p>
-              )}
-            </div>
-          )}
+          <p className="mt-3 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-xl px-3 py-2">
+            👨 Torneo masculino: solo pueden anotarse hombres.
+          </p>
         </section>
 
         {/* Datos personales */}
@@ -258,7 +213,7 @@ export default function IndividualForm() {
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Género *</label>
               <div className="flex rounded-xl border border-gray-200 overflow-hidden text-sm font-semibold">
-                {(modalidad === 'Masculino' ? (['Masculino'] as Genero[]) : (['Masculino', 'Femenino'] as Genero[])).map((g) => (
+                {(['Masculino'] as Genero[]).map((g) => (
                   <button
                     key={g}
                     type="button"
@@ -275,8 +230,8 @@ export default function IndividualForm() {
                   </button>
                 ))}
               </div>
-              {modalidad === 'Masculino' && genero !== 'Masculino' && (
-                <p className="text-red-500 text-xs mt-1">En modalidad masculina debes ser hombre.</p>
+              {genero !== 'Masculino' && (
+                <p className="text-red-500 text-xs mt-1">Este torneo es masculino: debes ser hombre.</p>
               )}
             </div>
           </div>
@@ -288,15 +243,15 @@ export default function IndividualForm() {
             <p>✅ Respeto absoluto hacia todos los participantes, árbitros y espectadores.</p>
             <p>🚫 Cero groserías ni lenguaje ofensivo durante toda la jornada.</p>
             <p>🚫 Cero consumo de alcohol antes o durante el evento.</p>
-            <p>🙏 Este es un evento de El Ministerio Ordóñez — promovemos la sana convivencia.</p>
+            <p>🙏 Este es un evento de Pastores Gómez — promovemos la sana convivencia.</p>
             <div className="pt-2 mt-1 border-t border-amber-200 bg-amber-50 -mx-1 px-3 py-2.5 rounded-lg text-amber-900">
               <p>
                 🚫 <strong>No se admiten jugadores piratas ni semiprofesionales</strong> que vengan solo a
-                competir por dinero o a imponer un nivel profesional. El Torneo Ágape es un espacio de
+                competir por dinero o a imponer un nivel profesional. El Torneo Relámpago es un espacio de
                 integración y sana convivencia. Incumplir esta regla puede resultar en la exclusión.
               </p>
             </div>
-            <p>🔄 Los equipos tienen plantilla máxima de {getMaximoJugadores('Fútbol 5')} jugadores ({MINIMOS['Fútbol 5']} en cancha + {CAMBIOS_POR_EQUIPO} cambio).</p>
+            <p>🔄 Los equipos tienen plantilla máxima de {getMaximoJugadores('Fútbol 5')} jugadores ({MINIMOS['Fútbol 5']} en cancha + {CAMBIOS_POR_EQUIPO} suplentes).</p>
           </div>
           <label className="flex items-start gap-3 cursor-pointer">
             <input

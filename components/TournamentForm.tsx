@@ -5,7 +5,7 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Disciplina, Genero, FormValues, DISCIPLINA_FUTBOL_5, Modalidad } from '@/lib/types';
-import { PRECIO_POR_JUGADOR_COP, INSCRIPCION_TORNEO_COP, PAGO_INSCRIPCION_MITAD_COP, PREMIO_TORNEO_COP, SALDO_INSCRIPCION_COP, CAMBIOS_POR_EQUIPO, formatCOP, MINIMOS, calificaPagoMitad, getMaximoJugadores, getUmbralPagoMitad } from '@/lib/constants';
+import { PRECIO_POR_JUGADOR_COP, INSCRIPCION_TORNEO_COP, PAGO_INSCRIPCION_MITAD_COP, PREMIOS_TORNEO, SALDO_INSCRIPCION_COP, CAMBIOS_POR_EQUIPO, formatCOP, MINIMOS, calificaPagoMitad, getMaximoJugadores, getUmbralPagoMitad } from '@/lib/constants';
 import { uploadComprobante as uploadComprobanteFile } from '@/lib/uploadComprobante';
 
 const FECHAS: Record<Disciplina, string> = {
@@ -103,15 +103,7 @@ export default function TournamentForm() {
   const umbralPagoMitad = getUmbralPagoMitad(disciplina);
   const listoParaInscribir = calificaPagoMitad(totalJugadores, disciplina);
   const totalPagar = PAGO_INSCRIPCION_MITAD_COP;
-  const soloMasculino = modalidad === 'Masculino';
-
-  const handleModalidadChange = (next: Modalidad) => {
-    setValue('modalidad', next);
-    if (next === 'Masculino') {
-      setValue('capitan.genero', 'Masculino');
-      fields.forEach((_, index) => setValue(`jugadores.${index}.genero`, 'Masculino'));
-    }
-  };
+  const soloMasculino = true;
 
   const uploadComprobante = (file: File): Promise<string> => {
     return uploadComprobanteFile(file, setUploadProgress);
@@ -122,12 +114,10 @@ export default function TournamentForm() {
       setSubmitError('Las inscripciones de Voleibol ya están cerradas. El torneo se celebró.');
       return;
     }
-    if (data.modalidad === 'Masculino') {
-      const todosMasculinos = [data.capitan, ...data.jugadores].every((j) => j.genero === 'Masculino');
-      if (!todosMasculinos) {
-        setSubmitError('En modalidad masculina todos los jugadores deben ser hombres.');
-        return;
-      }
+    const todosMasculinos = [data.capitan, ...data.jugadores].every((j) => j.genero === 'Masculino');
+    if (!todosMasculinos) {
+      setSubmitError('Este torneo es masculino: todos los jugadores deben ser hombres.');
+      return;
     }
     if (!comprobanteFile) {
       setSubmitError('Por favor adjunta el comprobante de pago.');
@@ -156,7 +146,7 @@ export default function TournamentForm() {
       const maxPlantilla = getMaximoJugadores(data.disciplina);
       if (jugadores.length > maxPlantilla) {
         setSubmitError(
-          `La plantilla no puede superar ${maxPlantilla} jugadores (${MINIMOS[data.disciplina]} en cancha + ${CAMBIOS_POR_EQUIPO} cambio).`
+          `La plantilla no puede superar ${maxPlantilla} jugadores (${MINIMOS[data.disciplina]} en cancha + ${CAMBIOS_POR_EQUIPO} suplentes).`
         );
         return;
       }
@@ -173,7 +163,7 @@ export default function TournamentForm() {
       await addDoc(collection(db, 'inscripciones'), {
         equipoNombre: data.equipoNombre,
         disciplina: data.disciplina,
-        modalidad: data.modalidad,
+        modalidad: 'Masculino',
         fechaTorneo: FECHAS[data.disciplina],
         capitan: data.capitan,
         jugadores,
@@ -253,16 +243,18 @@ export default function TournamentForm() {
 
         <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5">
           <h3 className="font-bold text-emerald-900 mb-2 text-base">
-            💡 Inscripción: abona el 50% ({formatCOP(PAGO_INSCRIPCION_MITAD_COP)}) · Premio {formatCOP(PREMIO_TORNEO_COP)}
+            💡 Inscripción: asegura el cupo con {formatCOP(PAGO_INSCRIPCION_MITAD_COP)} · Tres premios
           </h3>
           <ul className="text-sm text-emerald-800 space-y-1.5 leading-relaxed">
-            <li>
-              <strong>Premio al campeón: {formatCOP(PREMIO_TORNEO_COP)}.</strong>
-            </li>
+            {PREMIOS_TORNEO.map((premio) => (
+              <li key={premio.lugar}>
+                <strong>{premio.lugar}: {formatCOP(premio.montoCOP)}.</strong>
+              </li>
+            ))}
             <li>
               <strong>Inscripción del torneo: {formatCOP(INSCRIPCION_TORNEO_COP)} por equipo</strong> ({formatCOP(PRECIO_POR_JUGADOR_COP)} por persona).
               Debes registrar al menos <strong>{umbralPagoMitad} jugadores</strong> (más de la mitad de los {maxJugadores}) y
-              abonar el <strong>50% de la inscripción</strong> ({formatCOP(PAGO_INSCRIPCION_MITAD_COP)}).
+              asegurar el cupo con <strong>{formatCOP(PAGO_INSCRIPCION_MITAD_COP)}</strong> (50% de la inscripción).
             </li>
             <li>
               El saldo restante ({formatCOP(SALDO_INSCRIPCION_COP)}) se coordina con los organizadores antes del torneo.
@@ -271,31 +263,23 @@ export default function TournamentForm() {
               Ese dinero <strong>no se devuelve</strong>: con él confirmamos el cupo y organizamos el torneo.
             </li>
             <li>
-              Cada equipo puede hacer <strong>{CAMBIOS_POR_EQUIPO} cambio</strong> de jugador durante el torneo (validado por los coordinadores).
+              Cada equipo cuenta con <strong>{CAMBIOS_POR_EQUIPO} suplentes</strong> (validados por los encargados).
             </li>
             <li>
-              Plantilla máxima de <strong>{getMaximoJugadores('Fútbol 5')}</strong> jugadores ({MINIMOS['Fútbol 5']} en cancha + {CAMBIOS_POR_EQUIPO} cambio). El día del partido se recomienda al menos{' '}
+              Plantilla máxima de <strong>{getMaximoJugadores('Fútbol 5')}</strong> jugadores ({MINIMOS['Fútbol 5']} en cancha + {CAMBIOS_POR_EQUIPO} suplentes). El día del partido se recomienda al menos{' '}
               {MINIMOS['Fútbol 5']} en cancha.
             </li>
             <li>
-              Puedes agregar jugadores ahora o más adelante con los coordinadores, hasta completar la plantilla.
+              Puedes agregar jugadores ahora o más adelante con los encargados, hasta completar la plantilla.
             </li>
           </ul>
         </div>
 
         {/* ── 1. Disciplina ── */}
         <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h2 className="text-lg font-bold text-gray-900 mb-1">1. Selecciona la Disciplina</h2>
-          <p className="text-sm text-gray-500 mb-4">El torneo de Voleibol ya se celebró. Ahora solo está abierta la inscripción de Fútbol 5 (masculino o mixto).</p>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="relative rounded-xl border-2 border-gray-200 bg-gray-50 p-5 flex flex-col items-center gap-2 opacity-60">
-              <span className="text-4xl">🏐</span>
-              <span className="font-bold text-gray-900 text-base">Voleibol</span>
-              <span className="text-xs text-center text-gray-500">Sáb. 22 Ago</span>
-              <span className="text-xs text-center font-semibold px-2 py-0.5 rounded-full bg-gray-200 text-gray-600">
-                Inscripciones cerradas
-              </span>
-            </div>
+          <h2 className="text-lg font-bold text-gray-900 mb-1">1. Disciplina</h2>
+          <p className="text-sm text-gray-500 mb-4">Inscripción abierta para Fútbol 5 masculino.</p>
+          <div className="grid grid-cols-1 gap-4">
             <label
               className={`relative cursor-pointer rounded-xl border-2 p-5 flex flex-col items-center gap-2 transition-all ${disciplina === 'Fútbol 5'
                   ? 'border-emerald-500 bg-emerald-50 shadow-sm'
@@ -309,7 +293,7 @@ export default function TournamentForm() {
                 {MINIMOS['Fútbol 5']} en cancha · máx. {getMaximoJugadores('Fútbol 5')}
               </span>
               <span className="text-xs text-center font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                👨👫 Masculino o mixto
+                👨 Masculino
               </span>
               {disciplina === 'Fútbol 5' && (
                 <span className="absolute top-2.5 right-2.5 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center">
@@ -320,55 +304,9 @@ export default function TournamentForm() {
               )}
             </label>
           </div>
-          {disciplina === 'Fútbol 5' && (
-            <div className="mt-4">
-              <p className="text-sm font-semibold text-gray-800 mb-3">Modalidad de tu equipo</p>
-              <div className="grid grid-cols-2 gap-3">
-                {(['Masculino', 'Mixto'] as Modalidad[]).map((m) => (
-                  <label
-                    key={m}
-                    className={`relative cursor-pointer rounded-xl border-2 p-4 flex flex-col items-center gap-1.5 transition-all ${modalidad === m
-                        ? m === 'Mixto'
-                          ? 'border-purple-500 bg-purple-50 shadow-sm'
-                          : 'border-blue-500 bg-blue-50 shadow-sm'
-                        : 'border-gray-200 hover:border-gray-300 bg-white'
-                      }`}
-                  >
-                    <input
-                      type="radio"
-                      value={m}
-                      checked={modalidad === m}
-                      onChange={() => handleModalidadChange(m)}
-                      className="sr-only"
-                    />
-                    <span className="text-2xl">{m === 'Mixto' ? '👫' : '👨'}</span>
-                    <span className="font-bold text-gray-900 text-sm">{m}</span>
-                    <span className="text-[11px] text-center text-gray-500 leading-snug">
-                      {m === 'Mixto'
-                        ? 'Hombres y mujeres · regla en cancha'
-                        : 'Solo jugadores masculinos'}
-                    </span>
-                  </label>
-                ))}
-              </div>
-              {modalidad === 'Mixto' && (
-                <div className="mt-3 flex gap-3 p-3.5 bg-purple-50 border border-purple-200 rounded-xl text-sm text-purple-800">
-                  <span className="text-lg flex-shrink-0">👫</span>
-                  <div>
-                    <p className="font-semibold mb-0.5">Regla de género en cancha</p>
-                    <p className="leading-relaxed">
-                      En todo momento debe haber al menos <strong>1 jugador/a del sexo opuesto</strong> en la cancha.
-                    </p>
-                  </div>
-                </div>
-              )}
-              {modalidad === 'Masculino' && (
-                <p className="mt-3 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-xl px-3 py-2">
-                  👨 Modalidad masculina: todos los jugadores del equipo deben ser hombres.
-                </p>
-              )}
-            </div>
-          )}
+          <p className="mt-3 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-xl px-3 py-2">
+            👨 Torneo masculino: todos los jugadores del equipo deben ser hombres.
+          </p>
         </section>
 
         {/* ── 2. Nombre del Equipo ── */}
@@ -486,19 +424,11 @@ export default function TournamentForm() {
               </div>
             )
           )}
-          {modalidad === 'Mixto' && (
-            <div className="mb-4 flex gap-2.5 p-3 bg-purple-50 border border-purple-200 rounded-xl text-xs text-purple-700 leading-relaxed">
-              <span className="flex-shrink-0">👫</span>
-              <span>
-                <strong>Modalidad mixta:</strong> Registra jugadores y jugadoras. En cancha siempre debe haber al menos 1 persona del sexo opuesto a la mayoría.
-              </span>
-            </div>
-          )}
           {modalidad === 'Masculino' && (
             <div className="mb-4 flex gap-2.5 p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-700 leading-relaxed">
               <span className="flex-shrink-0">👨</span>
               <span>
-                <strong>Modalidad masculina:</strong> Todos los jugadores del equipo deben ser hombres.
+                <strong>Torneo masculino:</strong> Todos los jugadores del equipo deben ser hombres.
               </span>
             </div>
           )}
@@ -581,19 +511,11 @@ export default function TournamentForm() {
           </button>
 
           {(() => {
-            const allPlayers = [
-              { genero: watch('capitan.genero') ?? 'Masculino' },
-              ...fields.map((_, i) => ({ genero: watch(`jugadores.${i}.genero`) ?? 'Masculino' })),
-            ];
-            const masculinos = allPlayers.filter((p) => p.genero === 'Masculino').length;
-            const femeninos = allPlayers.filter((p) => p.genero === 'Femenino').length;
+            const total = 1 + fields.length;
             return (
               <div className="mt-3 flex gap-3 text-xs font-semibold">
                 <span className="flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full">
-                  ♂ {masculinos} {masculinos === 1 ? 'hombre' : 'hombres'}
-                </span>
-                <span className="flex items-center gap-1 px-3 py-1.5 bg-rose-50 text-rose-600 rounded-full">
-                  ♀ {femeninos} {femeninos === 1 ? 'mujer' : 'mujeres'}
+                  ♂ {total} {total === 1 ? 'hombre' : 'hombres'}
                 </span>
               </div>
             );
@@ -628,7 +550,7 @@ export default function TournamentForm() {
               {formatCOP(INSCRIPCION_TORNEO_COP)})
             </p>
             <p>
-              Transfiere el monto indicado al medio señalado por los coordinadores (Nequi / Daviplata / cuenta bancaria)
+              Transfiere el monto indicado al medio señalado por los encargados (Nequi / Daviplata / cuenta bancaria)
               y adjunta el screenshot o foto del comprobante.
             </p>
             <p>
@@ -707,23 +629,21 @@ export default function TournamentForm() {
             <p>✅ Respeto absoluto hacia todos los participantes, árbitros y espectadores.</p>
             <p>🚫 Cero groserías ni lenguaje ofensivo durante toda la jornada.</p>
             <p>🚫 Cero consumo de alcohol antes o durante el evento.</p>
-            <p>🙏 Este es un evento de El Ministerio Ordóñez — promovemos la sana convivencia.</p>
+            <p>🙏 Este es un evento de Pastores Gómez — promovemos la sana convivencia.</p>
             <div className="pt-2 mt-1 border-t border-amber-200 bg-amber-50 -mx-1 px-3 py-2.5 rounded-lg text-amber-900">
               <p>
                 🚫 <strong>No se admiten jugadores piratas ni semiprofesionales</strong> que vengan solo a
-                competir por dinero o a imponer un nivel profesional. El Torneo Ágape es un espacio de
+                competir por dinero o a imponer un nivel profesional. El Torneo Relámpago es un espacio de
                 integración y sana convivencia. Incumplir esta regla puede resultar en la exclusión del equipo.
               </p>
             </div>
             <p className="pt-1 border-t border-gray-200">
-              🔄 <strong>Cambios:</strong> Cada equipo puede hacer {CAMBIOS_POR_EQUIPO} cambio de jugador durante el torneo. La plantilla máxima es de {maxJugadores} personas ({MINIMOS[disciplina]} en cancha + {CAMBIOS_POR_EQUIPO} cambio).
+              🔄 <strong>Suplentes:</strong> Cada equipo cuenta con {CAMBIOS_POR_EQUIPO} suplentes. La plantilla máxima es de {maxJugadores} personas ({MINIMOS[disciplina]} en cancha + {CAMBIOS_POR_EQUIPO} suplentes).
             </p>
 
-            {modalidad === 'Masculino' && (
-              <p className="pt-1 border-t border-gray-200">
-                👨 <strong>Modalidad masculina:</strong> Solo participan jugadores hombres. Incumplir esta regla puede resultar en descalificación del equipo.
-              </p>
-            )}
+            <p className="pt-1 border-t border-gray-200">
+              👨 <strong>Torneo masculino:</strong> Solo participan jugadores hombres. Incumplir esta regla puede resultar en descalificación del equipo.
+            </p>
           </div>
           <label className="flex items-start gap-3 cursor-pointer">
             <input
@@ -734,7 +654,7 @@ export default function TournamentForm() {
               className="mt-0.5 w-5 h-5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 flex-shrink-0"
             />
             <span className="text-sm text-gray-700">
-              Confirmo que he leído y acepto el reglamento de convivencia del Torneo Ágape 2026 para todos los
+              Confirmo que he leído y acepto el reglamento de convivencia del Torneo Relámpago para todos los
               miembros de mi equipo, incluyendo que no participamos con jugadores piratas ni semiprofesionales.
             </span>
           </label>

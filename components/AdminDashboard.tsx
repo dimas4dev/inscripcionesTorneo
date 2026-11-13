@@ -46,7 +46,7 @@ function GenderToggle({
 }) {
   return (
     <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-semibold">
-      {(['Masculino', 'Femenino'] as Genero[]).map((g) => (
+      {(['Masculino'] as Genero[]).map((g) => (
         <button
           key={g}
           type="button"
@@ -144,7 +144,7 @@ function exportToCSV(data: Inscripcion[]) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `inscripciones-torneo-agape-${new Date().toISOString().split('T')[0]}.csv`;
+  a.download = `inscripciones-torneo-relampago-${new Date().toISOString().split('T')[0]}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -271,7 +271,7 @@ function PlayerModal({
     const maxPlantilla = getMaximoJugadores(inscripcion.disciplina);
     if (jugadores.length > maxPlantilla) {
       setRosterError(
-        `La plantilla no puede superar ${maxPlantilla} jugadores (${getMinimoJugadores(inscripcion.disciplina)} en cancha + ${CAMBIOS_POR_EQUIPO} cambio).`
+        `La plantilla no puede superar ${maxPlantilla} jugadores (${getMinimoJugadores(inscripcion.disciplina)} en cancha + ${CAMBIOS_POR_EQUIPO} suplentes).`
       );
       return;
     }
@@ -1104,9 +1104,6 @@ function IndividualesPanel({ individuales, onRefresh, onRequestDelete }: Individ
 
   return (
     <div className="space-y-5">
-      <p className="text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">
-        El voleibol ya finalizó. Esta lista muestra Fútbol 5 (masculino o mixto). El historial de voleibol sigue en Finanzas.
-      </p>
       {/* Progreso de cupos */}
       <div className="grid grid-cols-1 gap-4">
         <div
@@ -1117,7 +1114,7 @@ function IndividualesPanel({ individuales, onRefresh, onRequestDelete }: Individ
           <div className="flex items-center justify-between mb-3">
             <div>
               <p className="font-bold text-gray-900">⚽ Fútbol 5</p>
-              <p className="text-xs text-gray-500">Masculino o mixto</p>
+              <p className="text-xs text-gray-500">Masculino</p>
             </div>
             <span className={`text-2xl font-extrabold ${complete ? 'text-emerald-600' : 'text-gray-900'}`}>
               {count}<span className="text-sm font-normal text-gray-400">/{min}</span>
@@ -1279,49 +1276,38 @@ type FinanceSlice = {
 };
 
 interface FinanzasPanelProps {
-  voleibol: FinanceSlice;
   futbol5: FinanceSlice;
-  recaudadoTotal: number;
-  premioTotal: number;
-  gananciaTotal: number;
-  totalEquipos: number;
   pendientesPago: number;
 }
 
 function FinanzasPanel({
-  voleibol,
   futbol5,
-  recaudadoTotal,
-  premioTotal,
-  gananciaTotal,
-  totalEquipos,
   pendientesPago,
 }: FinanzasPanelProps) {
   return (
     <div className="space-y-5">
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-        <h2 className="text-base font-bold text-gray-900 mb-1">Consolidado de los dos torneos</h2>
+        <h2 className="text-base font-bold text-gray-900 mb-1">Finanzas de Fútbol 5</h2>
         <p className="text-sm text-gray-500 mb-4">
-          Recaudo total y ganancia sumando voleibol y fútbol 5. Voleibol mantiene premio al 30% de su recaudo
-          (torneo finalizado). Fútbol 5 tiene premio fijo de {formatCOP(PREMIO_FUTBOL5_COP)}.
+          Recaudo y ganancia del torneo. Los premios suman {formatCOP(PREMIO_FUTBOL5_COP)} entre campeón, subcampeón y tercer lugar.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="rounded-xl bg-amber-50 border border-amber-100 p-4">
-            <p className="text-xs font-medium text-amber-700 uppercase tracking-wide">Recaudado de todos</p>
-            <p className="text-2xl font-extrabold text-amber-900 mt-1">{formatCOP(recaudadoTotal)}</p>
-            <p className="text-xs text-amber-700 mt-1">{totalEquipos} equipos inscritos</p>
+            <p className="text-xs font-medium text-amber-700 uppercase tracking-wide">Recaudado</p>
+            <p className="text-2xl font-extrabold text-amber-900 mt-1">{formatCOP(futbol5.recaudado)}</p>
+            <p className="text-xs text-amber-700 mt-1">{futbol5.equipos} equipos · {futbol5.jugadores} jugadores</p>
           </div>
           <div className="rounded-xl bg-violet-50 border border-violet-100 p-4">
-            <p className="text-xs font-medium text-violet-700 uppercase tracking-wide">Premios (suma de cada torneo)</p>
-            <p className="text-2xl font-extrabold text-violet-900 mt-1">{formatCOP(premioTotal)}</p>
+            <p className="text-xs font-medium text-violet-700 uppercase tracking-wide">Premios</p>
+            <p className="text-2xl font-extrabold text-violet-900 mt-1">{formatCOP(futbol5.premio)}</p>
             <p className="text-xs text-violet-700 mt-1">
-              30% voleibol + {formatCOP(PREMIO_FUTBOL5_COP)} fútbol 5
+              {formatCOP(PREMIO_FUTBOL5_COP)} entre los tres puestos
             </p>
           </div>
           <div className="rounded-xl bg-teal-50 border border-teal-100 p-4">
-            <p className="text-xs font-medium text-teal-700 uppercase tracking-wide">Ganancia de los dos torneos</p>
-            <p className="text-2xl font-extrabold text-teal-900 mt-1">{formatCOP(gananciaTotal)}</p>
-            <p className="text-xs text-teal-700 mt-1">Suma de ganancias por torneo</p>
+            <p className="text-xs font-medium text-teal-700 uppercase tracking-wide">Ganancia</p>
+            <p className="text-2xl font-extrabold text-teal-900 mt-1">{formatCOP(futbol5.ganancia)}</p>
+            <p className="text-xs text-teal-700 mt-1">Recaudo menos premios</p>
           </div>
         </div>
         {pendientesPago > 0 && (
@@ -1329,77 +1315,6 @@ function FinanzasPanel({
             Hay {pendientesPago} pago{pendientesPago !== 1 ? 's' : ''} pendiente{pendientesPago !== 1 ? 's' : ''} de revisar. Ajusta los montos en Equipos para que estas cifras coincidan con los comprobantes.
           </p>
         )}
-      </div>
-
-      <div>
-        <h2 className="text-base font-bold text-gray-900 mb-3">Por torneo</h2>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {([
-            {
-              key: 'voleibol',
-              emoji: '🏐',
-              label: 'Voleibol',
-              data: voleibol,
-              wrap: 'bg-emerald-50 border-emerald-100',
-              title: 'text-emerald-800',
-              muted: 'text-emerald-700',
-              premioLabel: 'Premio 30%',
-              gananciaLabel: 'Ganancia 70%',
-            },
-            {
-              key: 'futbol5',
-              emoji: '⚽',
-              label: 'Fútbol 5',
-              data: futbol5,
-              wrap: 'bg-blue-50 border-blue-100',
-              title: 'text-blue-800',
-              muted: 'text-blue-700',
-              premioLabel: `Premio ${formatCOP(PREMIO_FUTBOL5_COP)}`,
-              gananciaLabel: 'Ganancia',
-            },
-          ] as const).map((torneo) => (
-            <div key={torneo.key} className={`rounded-xl border p-5 ${torneo.wrap}`}>
-              <div className="flex items-start justify-between gap-3 mb-4">
-                <div>
-                  <p className={`text-sm font-bold ${torneo.title}`}>
-                    {torneo.emoji} {torneo.label}
-                  </p>
-                  <p className={`text-xs mt-0.5 ${torneo.muted}`}>
-                    {torneo.data.equipos} equipo{torneo.data.equipos !== 1 ? 's' : ''} · {torneo.data.jugadores} jugador
-                    {torneo.data.jugadores !== 1 ? 'es' : ''}
-                    {torneo.key === 'futbol5' ? ' · Masculino o mixto' : ''}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  {torneo.key === 'voleibol' && (
-                    <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-gray-200 text-gray-600">
-                      Finalizado
-                    </span>
-                  )}
-                  {torneo.data.pendientesPago > 0 && (
-                    <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-100 text-amber-800">
-                      {torneo.data.pendientesPago} por revisar
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <p className={`text-[11px] font-medium uppercase tracking-wide ${torneo.muted}`}>Recaudado</p>
-                  <p className={`text-lg font-extrabold ${torneo.title}`}>{formatCOP(torneo.data.recaudado)}</p>
-                </div>
-                <div>
-                  <p className={`text-[11px] font-medium uppercase tracking-wide ${torneo.muted}`}>{torneo.premioLabel}</p>
-                  <p className={`text-lg font-extrabold ${torneo.title}`}>{formatCOP(torneo.data.premio)}</p>
-                </div>
-                <div>
-                  <p className={`text-[11px] font-medium uppercase tracking-wide ${torneo.muted}`}>{torneo.gananciaLabel}</p>
-                  <p className={`text-lg font-extrabold ${torneo.title}`}>{formatCOP(torneo.data.ganancia)}</p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   );
@@ -1573,20 +1488,11 @@ export default function AdminDashboard() {
       };
     };
 
-    const voleibol = byDisciplina('Voleibol');
     const futbol5 = byDisciplina('Fútbol 5');
-    const recaudadoTotal = voleibol.recaudado + futbol5.recaudado;
-    const premioTotal = voleibol.premio + futbol5.premio;
-    const gananciaTotal = voleibol.ganancia + futbol5.ganancia;
 
     return {
-      voleibol,
       futbol5,
-      recaudadoTotal,
-      premioTotal,
-      gananciaTotal,
-      totalEquipos: voleibol.equipos + futbol5.equipos,
-      pendientesPago: voleibol.pendientesPago + futbol5.pendientesPago,
+      pendientesPago: futbol5.pendientesPago,
     };
   }, [inscripciones]);
 
@@ -1672,12 +1578,7 @@ service cloud.firestore {
 
       {activeTab === 'finanzas' ? (
         <FinanzasPanel
-          voleibol={stats.voleibol}
           futbol5={stats.futbol5}
-          recaudadoTotal={stats.recaudadoTotal}
-          premioTotal={stats.premioTotal}
-          gananciaTotal={stats.gananciaTotal}
-          totalEquipos={stats.totalEquipos}
           pendientesPago={stats.pendientesPago}
         />
       ) : activeTab === 'individuales' ? (
@@ -1691,9 +1592,6 @@ service cloud.firestore {
         />
       ) : (
       <>
-      <p className="text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 mb-4">
-        El voleibol ya finalizó. Aquí solo aparecen equipos de Fútbol 5 (masculino o mixto). El recaudo de voleibol se mantiene en Finanzas.
-      </p>
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1 relative">

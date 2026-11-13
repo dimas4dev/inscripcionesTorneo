@@ -64,7 +64,7 @@ export default function LoginForm() {
             </svg>
           </div>
           <h1 className="text-xl font-extrabold text-gray-900">Mesa de Control</h1>
-          <p className="text-sm text-gray-500 mt-1">⚡ Torneo Ágape 2026</p>
+          <p className="text-sm text-gray-500 mt-1">⚡ Torneo Relámpago</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -132,7 +132,7 @@ export default function LoginForm() {
         </form>
 
         <p className="text-center text-xs text-gray-400 mt-6">
-          Acceso exclusivo para coordinadores del torneo
+          Acceso exclusivo para encargados del torneo
         </p>
       </div>
     </div>
