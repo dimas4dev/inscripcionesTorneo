@@ -21,6 +21,8 @@ export const PREMIO_TORNEO_COP = PREMIOS_TORNEO[0].montoCOP;
 export const PREMIO_VOLEIBOL_PORCENTAJE = 0.3;
 /** Suplentes por equipo en Fútbol 5. */
 export const CAMBIOS_POR_EQUIPO = 3;
+/** Llave Bre-B para el abono de la inscripción. */
+export const LLAVE_BREB = '3204371585';
 
 export const MINIMOS: Record<Disciplina, number> = { Voleibol: 6, 'Fútbol 5': 5 };
 export const MAXIMOS: Record<Disciplina, number> = {

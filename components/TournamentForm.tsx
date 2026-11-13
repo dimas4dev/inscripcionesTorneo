@@ -5,7 +5,7 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Disciplina, Genero, FormValues, DISCIPLINA_FUTBOL_5, Modalidad } from '@/lib/types';
-import { PRECIO_POR_JUGADOR_COP, INSCRIPCION_TORNEO_COP, PAGO_INSCRIPCION_MITAD_COP, PREMIOS_TORNEO, SALDO_INSCRIPCION_COP, CAMBIOS_POR_EQUIPO, formatCOP, MINIMOS, calificaPagoMitad, getMaximoJugadores, getUmbralPagoMitad } from '@/lib/constants';
+import { PRECIO_POR_JUGADOR_COP, INSCRIPCION_TORNEO_COP, PAGO_INSCRIPCION_MITAD_COP, PREMIOS_TORNEO, SALDO_INSCRIPCION_COP, CAMBIOS_POR_EQUIPO, LLAVE_BREB, formatCOP, MINIMOS, calificaPagoMitad, getMaximoJugadores, getUmbralPagoMitad } from '@/lib/constants';
 import { uploadComprobante as uploadComprobanteFile } from '@/lib/uploadComprobante';
 
 const FECHAS: Record<Disciplina, string> = {
@@ -620,8 +620,11 @@ export default function TournamentForm() {
               {formatCOP(INSCRIPCION_TORNEO_COP)})
             </p>
             <p>
-              Transfiere el monto indicado al medio señalado por los encargados (Nequi / Daviplata / cuenta bancaria)
-              y adjunta el screenshot o foto del comprobante.
+              Transfiere el monto por <strong>Bre-B</strong> a esta llave y adjunta el screenshot o foto del comprobante.
+            </p>
+            <p className="rounded-lg bg-white border border-amber-200 px-3 py-2 text-center">
+              <span className="block text-xs font-medium uppercase tracking-wide text-amber-700">Llave Bre-B</span>
+              <span className="block text-lg font-extrabold tracking-wide text-amber-950">{LLAVE_BREB}</span>
             </p>
             <p>
               <strong>Este dinero no se devuelve.</strong> El saldo restante ({formatCOP(SALDO_INSCRIPCION_COP)}) se
