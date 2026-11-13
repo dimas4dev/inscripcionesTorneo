@@ -10,7 +10,7 @@ const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "https://inscripcionestorne
 export const metadata: Metadata = {
   title: "Torneo Relámpago — Inscripciones",
   description:
-    "Inscribe tu equipo en el Torneo Relámpago. ⚽ Fútbol 5 · masculino. Pastores Gómez.",
+    "Inscribe tu equipo en el Torneo Relámpago. ⚽ Fútbol 5 · masculino o mixto. Pastores Gómez.",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "⚡ Torneo Relámpago — ¡Inscribe tu equipo!",
     description:
-      "⚽ Fútbol 5 · masculino · Pastores Gómez",
+      "⚽ Fútbol 5 · masculino o mixto · Pastores Gómez",
     images: [`${BASE_URL}/og-image.png`],
   },
 };

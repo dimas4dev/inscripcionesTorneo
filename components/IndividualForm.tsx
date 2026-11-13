@@ -35,15 +35,21 @@ export default function IndividualForm() {
   });
 
   const disciplina = watch('disciplina');
+  const modalidad = watch('modalidad');
   const genero = watch('genero');
+
+  const handleModalidadChange = (next: Modalidad) => {
+    setValue('modalidad', next);
+    if (next === 'Masculino') setValue('genero', 'Masculino');
+  };
 
   const onSubmit = async (data: IndividualFormValues) => {
     if (data.disciplina === 'Voleibol') {
       setError('Las inscripciones de Voleibol ya están cerradas. El torneo se celebró.');
       return;
     }
-    if (data.genero !== 'Masculino') {
-      setError('Este torneo es masculino: solo pueden anotarse hombres.');
+    if (data.modalidad === 'Masculino' && data.genero !== 'Masculino') {
+      setError('En modalidad masculina debes ser hombre.');
       return;
     }
     setSubmitting(true);
@@ -55,7 +61,7 @@ export default function IndividualForm() {
         telefono: data.telefono,
         email: data.email,
         disciplina: data.disciplina,
-        modalidad: 'Masculino',
+        modalidad: data.modalidad,
         genero: data.genero,
         reglamentoAceptado: data.reglamentoAceptado,
         createdAt: serverTimestamp(),
@@ -115,7 +121,7 @@ export default function IndividualForm() {
         </h3>
         <ul className="text-sm text-amber-800 space-y-1.5 leading-relaxed list-none">
           <li>
-            <strong>1.</strong> Te anotas en la lista de Fútbol 5 masculino ({formatCOP(PRECIO_POR_JUGADOR_COP)} por persona).
+            <strong>1.</strong> Te anotas en la lista de Fútbol 5 ({formatCOP(PRECIO_POR_JUGADOR_COP)} por persona), en modalidad masculina o mixta.
           </li>
           <li>
             <strong>2.</strong> Los encargados reúnen a los individuales y forman equipos cuando hay cupo
@@ -137,7 +143,7 @@ export default function IndividualForm() {
         {/* Disciplina */}
         <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <h2 className="text-lg font-bold text-gray-900 mb-1">1. Disciplina</h2>
-          <p className="text-sm text-gray-500 mb-4">La lista está abierta para Fútbol 5 masculino.</p>
+          <p className="text-sm text-gray-500 mb-4">La lista está abierta para Fútbol 5 (masculino o mixto).</p>
           <div className="grid grid-cols-1 gap-4">
             <label
               className={`relative cursor-pointer rounded-xl border-2 p-5 flex flex-col items-center gap-2 transition-all ${
@@ -161,9 +167,38 @@ export default function IndividualForm() {
               )}
             </label>
           </div>
-          <p className="mt-3 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-xl px-3 py-2">
-            👨 Torneo masculino: solo pueden anotarse hombres.
-          </p>
+          <div className="mt-4">
+            <p className="text-sm font-semibold text-gray-800 mb-3">¿En qué modalidad quieres jugar?</p>
+            <div className="grid grid-cols-2 gap-3">
+              {(['Masculino', 'Mixto'] as Modalidad[]).map((m) => (
+                <label
+                  key={m}
+                  className={`relative cursor-pointer rounded-xl border-2 p-4 flex flex-col items-center gap-1.5 transition-all ${
+                    modalidad === m
+                      ? m === 'Mixto'
+                        ? 'border-purple-500 bg-purple-50 shadow-sm'
+                        : 'border-blue-500 bg-blue-50 shadow-sm'
+                      : 'border-gray-200 hover:border-gray-300 bg-white'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    value={m}
+                    checked={modalidad === m}
+                    onChange={() => handleModalidadChange(m)}
+                    className="sr-only"
+                  />
+                  <span className="text-2xl">{m === 'Mixto' ? '👫' : '👨'}</span>
+                  <span className="font-bold text-gray-900 text-sm">{m}</span>
+                </label>
+              ))}
+            </div>
+            {modalidad === 'Mixto' && (
+              <p className="mt-3 text-xs text-purple-700 bg-purple-50 border border-purple-200 rounded-xl px-3 py-2">
+                👫 En modalidad mixta, en cancha debe haber mínimo 1 persona del sexo opuesto a la mayoría.
+              </p>
+            )}
+          </div>
         </section>
 
         {/* Datos personales */}
@@ -213,7 +248,7 @@ export default function IndividualForm() {
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Género *</label>
               <div className="flex rounded-xl border border-gray-200 overflow-hidden text-sm font-semibold">
-                {(['Masculino'] as Genero[]).map((g) => (
+                {(modalidad === 'Masculino' ? (['Masculino'] as Genero[]) : (['Masculino', 'Femenino'] as Genero[])).map((g) => (
                   <button
                     key={g}
                     type="button"
@@ -230,8 +265,8 @@ export default function IndividualForm() {
                   </button>
                 ))}
               </div>
-              {genero !== 'Masculino' && (
-                <p className="text-red-500 text-xs mt-1">Este torneo es masculino: debes ser hombre.</p>
+              {modalidad === 'Masculino' && genero !== 'Masculino' && (
+                <p className="text-red-500 text-xs mt-1">En modalidad masculina debes ser hombre.</p>
               )}
             </div>
           </div>

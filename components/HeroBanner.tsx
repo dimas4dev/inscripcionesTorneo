@@ -12,7 +12,7 @@ export default function HeroBanner() {
         </h1>
         <div className="flex justify-center">
           <span className="inline-flex items-center justify-center gap-2 bg-white/10 backdrop-blur rounded-full px-5 py-2 text-sm font-medium">
-            ⚽ Fútbol 5 · masculino
+            ⚽ Fútbol 5 · masculino o mixto
           </span>
         </div>
         <p className="mt-4 text-emerald-400 text-xs">

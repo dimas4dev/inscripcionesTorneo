@@ -46,7 +46,7 @@ function GenderToggle({
 }) {
   return (
     <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-semibold">
-      {(['Masculino'] as Genero[]).map((g) => (
+      {(['Masculino', 'Femenino'] as Genero[]).map((g) => (
         <button
           key={g}
           type="button"
@@ -1114,7 +1114,7 @@ function IndividualesPanel({ individuales, onRefresh, onRequestDelete }: Individ
           <div className="flex items-center justify-between mb-3">
             <div>
               <p className="font-bold text-gray-900">⚽ Fútbol 5</p>
-              <p className="text-xs text-gray-500">Masculino</p>
+              <p className="text-xs text-gray-500">Masculino o mixto</p>
             </div>
             <span className={`text-2xl font-extrabold ${complete ? 'text-emerald-600' : 'text-gray-900'}`}>
               {count}<span className="text-sm font-normal text-gray-400">/{min}</span>
